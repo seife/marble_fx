@@ -211,12 +211,15 @@ void loop()
         scroll_sum += my;
         scroll = scroll_sum / 8;
       }
-      if (scroll != 0)
+      if (scroll != 0) {
         scroll_sum = 0;
-      Mouse.move(0, 0, scroll);
+        Mouse.move(0, 0, scroll);
+      }
     } else {
-      /* -my to get the scroll direction right... */
-      Mouse.move(mx, -my, 0);
+      /* -my to get the direction right... */
+      if (mx != 0 || my != 0) {
+        Mouse.move(mx, -my, 0);
+      }
       scroll_sum = 0;
     }
 
