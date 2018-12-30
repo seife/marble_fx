@@ -1,4 +1,13 @@
 /* * Logitech TrackMan Marble FX wheel driver
+ *
+ * Copyright © 2018 Stefan Seyfried <seife@tuxbox-git.slipkontur.de>
+ *
+ * This program is free software. It comes without any warranty, to
+ * the extent permitted by applicable law. You can redistribute it
+ * and/or modify it under the terms of the Do What The Fuck You Want
+ * To Public License, Version 2, as published by Sam Hocevar. See
+ * http://www.wtfpl.net/ for more details.
+ *
  *  tested on: paradisetronic Pro Micro (mini leonardo-compatible board)
  *             CMCU beetle (nano USB-connector-only leonardo-compatible)
  *
@@ -9,7 +18,7 @@
  *   https://forum.arduino.cc/index.php?topic=365472.0
  *
  *  default HW setup
- *   wire PS/2 connector to arduino
+ *   wire PS/2 connector to arduino PIN 2 (data) and 3 (clk)
  *   see: http://playground.arduino.cc/ComponentLib/Ps2mouse
  *
  *  driver limitations:
