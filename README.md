@@ -8,3 +8,5 @@ If a simple PS/2 <-> USB converter is used, the trackball operates in "legacy" 3
 This project uses an Arduino Leonardo (or compatible boards, like the CMCU Beetle) to interface the TrackmanFX's PS/2 port to USB HID.
 
 The smallest boards can be integrated directly into the trackball, so that the TrackmanFX appears as a "native" USB device.
+
+One example of such a modification is [here](doc/README.md).
