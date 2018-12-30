@@ -1,0 +1,113 @@
+diff -rup /usr/share/arduino/hardware/arduino/avr/boards.txt hardware/arduino/avr/boards.txt
+--- /usr/share/arduino/hardware/arduino/avr/boards.txt	2018-09-10 11:48:34.000000000 +0200
++++ hardware/arduino/avr/boards.txt	2018-12-30 17:43:45.433062709 +0100
+@@ -310,7 +310,8 @@ leonardo.build.mcu=atmega32u4
+ leonardo.build.f_cpu=16000000L
+ leonardo.build.vid=0x2341
+ leonardo.build.pid=0x8036
+-leonardo.build.usb_product="Arduino Leonardo"
++#leonardo.build.usb_product="Arduino Leonardo"
++leonardo.build.usb_product="MarbleFX USB"
+ leonardo.build.board=AVR_LEONARDO
+ leonardo.build.core=arduino
+ leonardo.build.variant=leonardo
+diff -rup /usr/share/arduino/hardware/arduino/avr/cores/arduino/CDC.cpp hardware/arduino/avr/cores/arduino/CDC.cpp
+--- /usr/share/arduino/hardware/arduino/avr/cores/arduino/CDC.cpp	2018-09-10 11:48:30.000000000 +0200
++++ hardware/arduino/avr/cores/arduino/CDC.cpp	2018-12-30 17:09:20.346204737 +0100
+@@ -16,6 +16,7 @@
+ ** SOFTWARE.  
+ */
+ 
++#if 0
+ #include "USBAPI.h"
+ #include <avr/wdt.h>
+ #include <util/atomic.h>
+@@ -300,3 +301,4 @@ int32_t Serial_::readBreak() {
+ Serial_ Serial;
+ 
+ #endif /* if defined(USBCON) */
++#endif
+diff -rup /usr/share/arduino/hardware/arduino/avr/cores/arduino/USBCore.cpp hardware/arduino/avr/cores/arduino/USBCore.cpp
+--- /usr/share/arduino/hardware/arduino/avr/cores/arduino/USBCore.cpp	2018-09-10 11:48:30.000000000 +0200
++++ hardware/arduino/avr/cores/arduino/USBCore.cpp	2018-12-30 17:36:31.682591011 +0100
+@@ -70,7 +70,7 @@ const u8 STRING_MANUFACTURER[] PROGMEM =
+ 
+ //	DEVICE DESCRIPTOR
+ const DeviceDescriptor USB_DeviceDescriptorIAD =
+-	D_DEVICE(0xEF,0x02,0x01,64,USB_VID,USB_PID,0x100,IMANUFACTURER,IPRODUCT,ISERIAL,1);
++	D_DEVICE(0x00,0x00,0x00,64,USB_VID,USB_PID,0x100,IMANUFACTURER,IPRODUCT,ISERIAL,1);
+ 
+ //==================================================================
+ //==================================================================
+@@ -375,8 +375,10 @@ bool ClassInterfaceRequest(USBSetup& set
+ {
+ 	u8 i = setup.wIndex;
+ 
++#if 0
+ 	if (CDC_ACM_INTERFACE == i)
+ 		return CDC_Setup(setup);
++#endif
+ 
+ #ifdef PLUGGABLE_USB_ENABLED
+ 	return PluggableUSB().setup(setup);
+@@ -466,7 +468,9 @@ static u8 SendInterfaces()
+ {
+ 	u8 interfaces = 0;
+ 
++#if 0
+ 	CDC_GetInterface(&interfaces);
++#endif
+ 
+ #ifdef PLUGGABLE_USB_ENABLED
+ 	PluggableUSB().getInterface(&interfaces);
+@@ -755,7 +759,9 @@ ISR(USB_GEN_vect)
+ 	//	Start of Frame - happens every millisecond so we use it for TX and RX LED one-shot timing, too
+ 	if (udint & (1<<SOFI))
+ 	{
++#if 0
+ 		USB_Flush(CDC_TX);				// Send a tx frame if found
++#endif
+ 		
+ 		// check whether the one-shot period has elapsed.  if so, turn off the LED
+ 		if (TxLEDPulse && !(--TxLEDPulse))
+Only in hardware/arduino/avr/cores/arduino: .USBCore.cpp.swp
+diff -rup /usr/share/arduino/hardware/arduino/avr/cores/arduino/USBDesc.h hardware/arduino/avr/cores/arduino/USBDesc.h
+--- /usr/share/arduino/hardware/arduino/avr/cores/arduino/USBDesc.h	2018-09-10 11:48:30.000000000 +0200
++++ hardware/arduino/avr/cores/arduino/USBDesc.h	2018-12-30 17:35:20.732820519 +0100
+@@ -26,6 +26,7 @@
+ 
+ #define ISERIAL_MAX_LEN     20
+ 
++#if 0
+ #define CDC_INTERFACE_COUNT	2
+ #define CDC_ENPOINT_COUNT	3
+ 
+@@ -40,7 +41,13 @@
+ 
+ #define CDC_RX CDC_ENDPOINT_OUT
+ #define CDC_TX CDC_ENDPOINT_IN
++#else
++#define CDC_ACM_INTERFACE 0
++#define CDC_INTERFACE_COUNT 0
++#define CDC_ENPOINT_COUNT 0
++#define CDC_FIRST_ENDPOINT 1
++#endif
+ 
+ #define IMANUFACTURER   1
+ #define IPRODUCT        2
+-#define ISERIAL         3
+\ No newline at end of file
++#define ISERIAL         3
+Only in hardware/arduino/avr/cores/arduino: .USBDesc.h.swp
+diff -rup /usr/share/arduino/hardware/arduino/avr/libraries/HID/src/HID.cpp hardware/arduino/avr/libraries/HID/src/HID.cpp
+--- /usr/share/arduino/hardware/arduino/avr/libraries/HID/src/HID.cpp	2017-10-16 13:20:29.000000000 +0200
++++ hardware/arduino/avr/libraries/HID/src/HID.cpp	2018-12-30 17:31:42.399379393 +0100
+@@ -30,7 +30,7 @@ int HID_::getInterface(uint8_t* interfac
+ {
+ 	*interfaceCount += 1; // uses 1
+ 	HIDDescriptor hidInterface = {
+-		D_INTERFACE(pluggedInterface, 1, USB_DEVICE_CLASS_HUMAN_INTERFACE, HID_SUBCLASS_NONE, HID_PROTOCOL_NONE),
++		D_INTERFACE(pluggedInterface, 1, USB_DEVICE_CLASS_HUMAN_INTERFACE, HID_SUBCLASS_BOOT_INTERFACE, HID_PROTOCOL_MOUSE),
+ 		D_HIDREPORT(descriptorSize),
+ 		D_ENDPOINT(USB_ENDPOINT_IN(pluggedEndpoint), USB_ENDPOINT_TYPE_INTERRUPT, USB_EP_SIZE, 0x01)
+ 	};

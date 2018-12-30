@@ -1,0 +1,8 @@
+This patch removes the ACM interface from the USB core and leaves only the
+HID part.
+
+Note: after deploying this, the leonardo board can no longer be updated
+directly from the Arduino IDE. After initiating the upload, you need to
+press the reset button on the board to put the bootloader into flash-mode.
+
+This has only been tested with marble_fx.ino, use at your own risk!
