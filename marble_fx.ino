@@ -41,7 +41,7 @@
 bool redbutton = false;
 bool buttons[3] = { false, false, false };
 // lucky us, the definitions of MOUSE_LEFT,_RIGHT,_MIDDLE are also 1,2,4...
-char bmask[3] = { 0x01, 0x02, 0x04 };
+uint8_t bmask[3] = { 0x01, 0x02, 0x04 };
 int scroll_sum = 0;
 
 /*
@@ -59,10 +59,10 @@ void setpin(int pin, bool value)
   }
 }
 
-void mouse_write(char data)
+void mouse_write(uint8_t data)
 {
-  char i;
-  char parity = 1;
+  uint8_t i;
+  uint8_t parity = 1;
 
   /* put pins in output mode */
   setpin(DATA_PIN, HIGH);
@@ -113,11 +113,11 @@ void mouse_write(char data)
 /*
  * Get a byte of data from the mouse
  */
-char mouse_read(void)
+uint8_t mouse_read(void)
 {
-  char data = 0x00;
+  uint8_t data = 0x00;
   int i;
-  char bit = 0x01;
+  uint8_t bit = 0x01;
 
   setpin(CLK_PIN, HIGH);
   setpin(DATA_PIN, HIGH);
@@ -174,16 +174,16 @@ static uint8_t magic[] = { 0xe8, 0x00, 0xe8, 0x03, 0xe8, 0x02, 0xe8, 0x01, 0xe6,
 void ps2pp_write_magic_ping()
 {
   /* e8 00 e8 03 e8 02 e8 01 e6 e8 03 e8 01 e8 02 e8 03 */
-  for (char i = 0; i < sizeof(magic); i++)
+  for (uint8_t i = 0; i < sizeof(magic); i++)
     mouse_write(magic[i]);
 }
 
-bool ps2pp_decode(char b0, char b1, char b2)
+bool ps2pp_decode(uint8_t b0, uint8_t b1, uint8_t b2)
 {
   if ((b0 & 0x48) != 0x48)
     return false;
-  char t = ((b0 & 0x30) << 4) || (b1 & 0x30);
-  char data = b2;
+  uint8_t t = ((b0 & 0x30) << 4) || (b1 & 0x30);
+  uint8_t data = b2;
   // int check = b1 & 0x0f;
   // if ((check & 0x03 == 2) && (check >> 2) == (data & 0x03)) {
   //   Serial.print("\t valid");
@@ -209,13 +209,13 @@ void loop()
 {
   mouse_write(0xeb);  /* give me data! */
   mouse_read();      /* ignore ack */
-  char mstat = mouse_read();
-  char mx    = mouse_read();
-  char my    = mouse_read();
+  uint8_t mstat = mouse_read();
+  int8_t mx    = (int8_t)mouse_read();
+  int8_t my    = (int8_t)mouse_read();
 
   if (!ps2pp_decode(mstat, mx, my)) {
     if (redbutton) { /* translate y scroll into wheel-scroll */
-      char scroll = my / 8;
+      int8_t scroll = my / 8;
       if (! scroll) {
         scroll_sum += my;
         scroll = scroll_sum / 8;
@@ -233,7 +233,7 @@ void loop()
     }
 
     /* handle normal buttons */
-    for (char i = 0; i < sizeof(buttons); i++) {
+    for (uint8_t i = 0; i < sizeof(buttons); i++) {
       bool button = mstat & bmask[i];
       if (!buttons[i] && button)
         Mouse.press(bmask[i]);
