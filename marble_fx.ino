@@ -43,6 +43,7 @@ bool buttons[3] = { false, false, false };
 // lucky us, the definitions of MOUSE_LEFT,_RIGHT,_MIDDLE are also 1,2,4...
 uint8_t bmask[3] = { 0x01, 0x02, 0x04 };
 int scroll_sum = 0;
+long lastchange[3] = {0, 0, 0};
 
 /*
  * https://www.arduino.cc/reference/en/language/functions/digital-io/pinmode/
@@ -233,8 +234,15 @@ void loop()
     }
 
     /* handle normal buttons */
+    long now = millis();
     for (uint8_t i = 0; i < sizeof(buttons); i++) {
       bool button = mstat & bmask[i];
+      /* debounce - my marble fx has a nervous right-click syndrome ;-) */
+      if (button != buttons[i]) {
+        if ((now - lastchange[i]) < 25)
+          continue;
+        lastchange[i] = now;
+      }
       if (!buttons[i] && button)
         Mouse.press(bmask[i]);
       else if (buttons[i] && !button)
