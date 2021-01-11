@@ -199,6 +199,16 @@ void setup()
   Mouse.begin();
 }
 
+long last_move = 0;
+int jigglecount = 0;
+
+void move(int8_t x, int8_t y, int8_t z)
+{
+  Mouse.move(x, y, z);
+  last_move = millis();
+  jigglecount = 0;
+}
+
 void loop()
 {
   mouse_write(0xeb);  /* give me data! */
@@ -216,12 +226,12 @@ void loop()
       }
       if (scroll != 0) {
         scroll_sum = 0;
-        Mouse.move(0, 0, scroll);
+        move(0, 0, scroll);
       }
     } else {
       /* -my to get the direction right... */
       if (mx != 0 || my != 0) {
-        Mouse.move(mx, -my, 0);
+        move(mx, -my, 0);
       }
       scroll_sum = 0;
     }
@@ -244,5 +254,12 @@ void loop()
     }
   }
 
+  long  jiggle = (millis() - last_move);
+  if (jiggle > 30000L * (jigglecount + 1) && jiggle < 1800000) {
+    jigglecount++;
+    if (!USBDevice.isSuspended()) {
+      Mouse.move(0,0,0);
+    }
+  }
   delay(20);
 }
