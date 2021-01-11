@@ -29,6 +29,8 @@
  *   press red button to emulate wheel movement with the ball
  */
 
+//# define SERIALDEBUG 1
+
 #include "Mouse.h"
 
 /*
@@ -187,6 +189,10 @@ bool ps2pp_decode(uint8_t b0, uint8_t b1, uint8_t b2)
   // mouse extra info
   if ((b0 & 0x30) == 0x0 && (b1 & 0xf0) == 0xd0) {
     redbutton = (b2 & 0x10);
+#ifdef SERIALDEBUG
+    Serial.print("redbutton: ");
+    Serial.println((int)redbutton);
+#endif
   }
   return true;
 }
@@ -197,6 +203,9 @@ void setup()
   mouse_init();
   ps2pp_write_magic_ping();
   Mouse.begin();
+#ifdef SERIALDEBUG
+  Serial.begin(115200); /* baudrate does not matter */
+#endif
 }
 
 long last_move = 0;
@@ -216,7 +225,14 @@ void loop()
   uint8_t mstat = mouse_read();
   int8_t mx    = (int8_t)mouse_read();
   int8_t my    = (int8_t)mouse_read();
-
+#ifdef SERIALDEBUG
+  Serial.println();
+  Serial.print((int)mstat, HEX);
+  Serial.print("\t");
+  Serial.print((int)mx);
+  Serial.print("\t");
+  Serial.println((int)my);
+#endif
   if (!ps2pp_decode(mstat, mx, my)) {
     if (redbutton) { /* translate y scroll into wheel-scroll */
       int8_t scroll = my / 8;
@@ -226,12 +242,22 @@ void loop()
       }
       if (scroll != 0) {
         scroll_sum = 0;
+#ifdef SERIALDEBUG
+        Serial.print("SCRL ");
+        Serial.println((int)scroll);
+#endif
         move(0, 0, scroll);
       }
     } else {
       /* -my to get the direction right... */
       if (mx != 0 || my != 0) {
         move(mx, -my, 0);
+#ifdef SERIALDEBUG
+        Serial.print("MOVE ");
+        Serial.print((int)mx);
+        Serial.print(" ");
+        Serial.println((int)my);
+#endif
       }
       scroll_sum = 0;
     }
@@ -258,6 +284,12 @@ void loop()
   if (jiggle > 30000L * (jigglecount + 1) && jiggle < 1800000) {
     jigglecount++;
     if (!USBDevice.isSuspended()) {
+#ifdef SERIALDEBUG
+      Serial.print("JIGGLE! ");
+      Serial.print(jiggle);
+      Serial.print(" ");
+      Serial.println(jigglecount);
+#endif
       Mouse.move(0,0,0);
     }
   }
