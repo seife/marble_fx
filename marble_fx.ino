@@ -233,7 +233,8 @@ void loop()
   Serial.print("\t");
   Serial.println((int)my);
 #endif
-  if (!ps2pp_decode(mstat, mx, my)) {
+  if (!ps2pp_decode(mstat, mx, my) &&
+      !USBDevice.isSuspended()) {
     if (redbutton) { /* translate y scroll into wheel-scroll */
       int8_t scroll = my / 8;
       if (! scroll) {
