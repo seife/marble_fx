@@ -181,20 +181,13 @@ void ps2pp_write_magic_ping()
 
 bool ps2pp_decode(uint8_t b0, uint8_t b1, uint8_t b2)
 {
-  if ((b0 & 0x48) != 0x48)
+  /* values from linux/drivers/input/mouse/logips2pp.c */
+  if ((b0 & 0x48) != 0x48 || (b1 & 0x02) != 0x02)
     return false;
-  uint8_t t = ((b0 & 0x30) << 4) || (b1 & 0x30);
-  uint8_t data = b2;
-  // int check = b1 & 0x0f;
-  // if ((check & 0x03 == 2) && (check >> 2) == (data & 0x03)) {
-  //   Serial.print("\t valid");
-  // }
-  // else {
-  //   Serial.print("\t ignore");
-  // }
   // mouse extra info
-  if (t == 1)
-    redbutton = (data & 0x10);
+  if ((b0 & 0x30) == 0x0 && (b1 & 0xf0) == 0xd0) {
+    redbutton = (b2 & 0x10);
+  }
   return true;
 }
 
