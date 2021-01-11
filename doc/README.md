@@ -19,7 +19,7 @@ I used a CJMCU Beetle board, because the integrated USB plug makes it very easy 
 ![Beetle USB+PCB cable](07-marble_fx-beetle2.jpg)
 
 ## Now connect it to the daughter PCB
-I used a connector from a Logitech USB mouse cable, so that I did not need to cutthe original PS/2 cable. So everything can be returned to the original state.
+I used a connector from a Logitech USB mouse cable, so that I did not need to cut the original PS/2 cable. So everything can be returned to the original state.
 ![Beetle + PCB1](08-marble_fx-beetle-pcb1.jpg)
 ![Beetle + PCB2](09-marble_fx-beetle-pcb2.jpg)
 
