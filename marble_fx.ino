@@ -105,7 +105,7 @@ void mouse_write(uint8_t data)
       ;
     parity = parity ^ (data & 0x01);
     data >>= 1;
-  }  
+  }
   /* parity */
   setpin(DATA_PIN, parity);
   while (digitalRead(CLK_PIN) == LOW)
@@ -280,52 +280,52 @@ void loop()
   Serial.print("\t");
   Serial.println((int)my);
 #endif
-  if (!ps2pp_decode(mstat, mx, my) &&
-      !USBDevice.isSuspended()) {
-    if (redbutton) { /* translate y scroll into wheel-scroll */
-      int8_t scroll = my / 8;
-      if (! scroll) {
-        scroll_sum += my;
-        scroll = scroll_sum / 8;
-      }
-      if (scroll != 0) {
-        scroll_sum = 0;
-#ifdef SERIALDEBUG
-        Serial.print("SCRL ");
-        Serial.println((int)scroll);
-#endif
-        move(0, 0, scroll);
-      }
-    } else {
-      /* -my to get the direction right... */
-      if (mx != 0 || my != 0) {
-        move(mx, -my, 0);
-#ifdef SERIALDEBUG
-        Serial.print("MOVE ");
-        Serial.print((int)mx);
-        Serial.print(" ");
-        Serial.println((int)my);
-#endif
-      }
-      scroll_sum = 0;
-    }
+  if (ps2pp_decode(mstat, mx, my) || USBDevice.isSuspended())
+    return; // do nothing.
 
-    /* handle normal buttons */
-    long now = millis();
-    for (uint8_t i = 0; i < sizeof(buttons); i++) {
-      bool button = mstat & bmask[i];
-      /* debounce - my marble fx has a nervous right-click syndrome ;-) */
-      if (button != buttons[i]) {
-        if ((now - lastchange[i]) < 25)
-          continue;
-        lastchange[i] = now;
-      }
-      if (!buttons[i] && button)
-        Mouse.press(bmask[i]);
-      else if (buttons[i] && !button)
-        Mouse.release(bmask[i]);
-      buttons[i] = button;
+  if (redbutton) { /* translate y scroll into wheel-scroll */
+    int8_t scroll = my / 8;
+    if (! scroll) {
+      scroll_sum += my;
+      scroll = scroll_sum / 8;
     }
+    if (scroll != 0) {
+      scroll_sum = 0;
+#ifdef SERIALDEBUG
+      Serial.print("SCRL ");
+      Serial.println((int)scroll);
+#endif
+      move(0, 0, scroll);
+    }
+  } else {
+    /* -my to get the direction right... */
+    if (mx != 0 || my != 0) {
+      move(mx, -my, 0);
+#ifdef SERIALDEBUG
+      Serial.print("MOVE ");
+      Serial.print((int)mx);
+      Serial.print(" ");
+      Serial.println((int)my);
+#endif
+    }
+    scroll_sum = 0;
+  }
+
+  /* handle normal buttons */
+  long now = millis();
+  for (uint8_t i = 0; i < sizeof(buttons); i++) {
+    bool button = mstat & bmask[i];
+    /* debounce - my marble fx has a nervous right-click syndrome ;-) */
+    if (button != buttons[i]) {
+      if ((now - lastchange[i]) < 25)
+        continue;
+      lastchange[i] = now;
+    }
+    if (!buttons[i] && button)
+      Mouse.press(bmask[i]);
+    else if (buttons[i] && !button)
+      Mouse.release(bmask[i]);
+    buttons[i] = button;
   }
 
 #ifndef STREAM_MODE
