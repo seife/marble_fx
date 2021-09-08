@@ -17,7 +17,7 @@
  *   Arduino Forum > Topics > Device Hacking > Logitech TrackMan Marble FX USB converter
  *   https://forum.arduino.cc/index.php?topic=365472.0
  *
- * SAMPLE_RATE setting idea from
+ * SAMPLE_RATE and STREAM_MODE setting idea from
  *   https://github.com/dkao/Logitech_Trackman_Marble_FX_PS2_to_USB_converter
  *
  *  default HW setup
@@ -42,6 +42,7 @@
 #define DATA_PIN 2
 #define CLK_PIN  3
 
+#define STREAM_MODE
 /*
  * Set sample rate.
  * PS/2 default sample rate is 100Hz.
@@ -125,18 +126,29 @@ void mouse_write(uint8_t data)
 
 /*
  * Get a byte of data from the mouse
+ * ret is the return code (true if data was delivered, false if timeout)
+ * timeout is 1000 millis
+ * timeout reporting is needed so that we can block in stream mode, but
+ * the mouse jiggler can still do its job ;-)
  */
-uint8_t mouse_read(void)
+uint8_t mouse_read(bool *ret = NULL)
 {
   uint8_t data = 0x00;
   int i;
   uint8_t bit = 0x01;
 
+  if (ret)
+    *ret = true;
   setpin(CLK_PIN, HIGH);
   setpin(DATA_PIN, HIGH);
   delayMicroseconds(50);
-  while (digitalRead(CLK_PIN) == HIGH)
-    ;
+  long start = millis();
+  while (digitalRead(CLK_PIN) == HIGH) {
+    if (ret && (millis() - start) > 1000) {
+       *ret = false;
+       goto out;
+    }
+  }
   delayMicroseconds(5);               /* debounce */
   while (digitalRead(CLK_PIN) == LOW) /* eat start bit */
     ;
@@ -161,6 +173,7 @@ uint8_t mouse_read(void)
   while (digitalRead(CLK_PIN) == LOW)
     ;
 
+out:
   /* stop incoming data. */
   setpin(CLK_PIN, LOW);
   return data;
@@ -181,8 +194,17 @@ void mouse_init()
   mouse_write(SAMPLE_RATE);
   mouse_read();  /* ack */
 #endif
+#ifndef STREAM_MODE
   mouse_write(0xf0);  /* remote mode */
   mouse_read();  /* ack */
+  delayMicroseconds(100);
+#endif
+}
+
+void mouse_enable_report()
+{
+  mouse_write(0xf4); /* enable report */
+  mouse_read(); /* ack */
   delayMicroseconds(100);
 }
 
@@ -216,12 +238,15 @@ bool ps2pp_decode(uint8_t b0, uint8_t b1, uint8_t b2)
 /* the main() program code */
 void setup()
 {
-  mouse_init();
-  ps2pp_write_magic_ping();
-  Mouse.begin();
 #ifdef SERIALDEBUG
   Serial.begin(115200); /* baudrate does not matter */
 #endif
+  mouse_init();
+  ps2pp_write_magic_ping();
+#ifdef STREAM_MODE
+  mouse_enable_report();
+#endif
+  Mouse.begin();
 }
 
 long last_move = 0;
@@ -236,9 +261,15 @@ void move(int8_t x, int8_t y, int8_t z)
 
 void loop()
 {
+  bool ret;
+#ifndef STREAM_MODE
   mouse_write(0xeb);  /* give me data! */
   mouse_read();      /* ignore ack */
-  uint8_t mstat = mouse_read();
+#endif
+  uint8_t mstat = mouse_read(&ret);
+#ifdef STREAM_MODE
+  if (ret) { /* no timeout */
+#endif
   int8_t mx    = (int8_t)mouse_read();
   int8_t my    = (int8_t)mouse_read();
 #ifdef SERIALDEBUG
@@ -297,6 +328,13 @@ void loop()
     }
   }
 
+#ifndef STREAM_MODE
+  delay(20);
+#endif
+#ifdef STREAM_MODE
+  }
+#endif
+
   long  jiggle = (millis() - last_move);
   if (jiggle > 30000L * (jigglecount + 1) && jiggle < 1800000) {
     jigglecount++;
@@ -310,5 +348,4 @@ void loop()
       Mouse.move(0,0,0);
     }
   }
-  delay(20);
 }
