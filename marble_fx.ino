@@ -60,9 +60,10 @@
  */
 #define SAMPLE_RATE 200
 
-/* lefthanded is right now statically defined during build
-   later it might be set to switches on digital inputs */
+/* lefthanded and jiggler are right now statically defined during build
+   later they might be set to switches on digital inputs */
 bool lefthanded = false;
+bool jiggler = true;
 /* global variables */
 uint8_t xtrabutton = 0;
 bool buttons[3] = { false, false, false };
@@ -372,6 +373,8 @@ void loop()
 #ifdef STREAM_MODE
   }
 #endif
+  if (! jiggler)
+    return;
 
   long  jiggle = (millis() - last_move);
   if (jiggle > 30000L * (jigglecount + 1) && jiggle < 1800000) {
@@ -383,7 +386,8 @@ void loop()
       Serial.print(" ");
       Serial.println(jigglecount);
 #endif
-      Mouse.move(0,0,0);
+      Mouse.move(1,0,0);
+      Mouse.move(-1,0,0);
     }
   }
 }
