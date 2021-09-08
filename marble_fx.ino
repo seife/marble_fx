@@ -1,6 +1,8 @@
-/* * Logitech TrackMan Marble FX wheel driver
+/*
+ * Logitech TrackMan Marble FX wheel driver
+ * also supports Logitech TrackMan Marble model T-BC21 (in ps/2 mode)
  *
- * Copyright © 2018 Stefan Seyfried <seife@tuxbox-git.slipkontur.de>
+ * Copyright © 2018-2021 Stefan Seyfried <seife@tuxbox-git.slipkontur.de>
  *
  * This program is free software. It comes without any warranty, to
  * the extent permitted by applicable law. You can redistribute it
@@ -10,6 +12,7 @@
  *
  *  tested on: paradisetronic Pro Micro (mini leonardo-compatible board)
  *             CMCU beetle (nano USB-connector-only leonardo-compatible)
+ *             Arduino Leonardo, probably a cheap clone board
  *
  *  PS2++ protocol specs from http://web.archive.org/web/20030714000535/http://dqcs.com/logitech/ps2ppspec.htm
  *
@@ -20,16 +23,23 @@
  * SAMPLE_RATE and STREAM_MODE setting idea from
  *   https://github.com/dkao/Logitech_Trackman_Marble_FX_PS2_to_USB_converter
  *
+ * The T-BC21 trackball has four buttons. It has an USB cable, but can also speak PS/2
+ * We use the PS/2 mode
+ *
  *  default HW setup
  *   wire PS/2 connector to arduino PIN 2 (data) and 3 (clk)
  *   see: http://playground.arduino.cc/ComponentLib/Ps2mouse
+ *   for the T-BC21, wire USB D- (next to VBUS) is data and USB D+ (next to GND) is clk
  *
  *  driver limitations:
  *   use at your own risk.
  *   super hack. tested on my own TrackMan Marble FX(T-CJ12) only
+ *               now also tested on TrackMan Marble (model T-BC21)
  *
  *  functionality:
- *   press red button to emulate wheel movement with the ball
+ *   Marble FX: press red button to emulate wheel movement with the ball
+ *   T-BC21: left small button is "red button", scroll wheel emulation,
+ *           right small button is "middle button" (button 3)
  */
 
 //# define SERIALDEBUG 1
@@ -50,8 +60,11 @@
  */
 #define SAMPLE_RATE 200
 
+/* lefthanded is right now statically defined during build
+   later it might be set to switches on digital inputs */
+bool lefthanded = false;
 /* global variables */
-bool redbutton = false;
+uint8_t xtrabutton = 0;
 bool buttons[3] = { false, false, false };
 // lucky us, the definitions of MOUSE_LEFT,_RIGHT,_MIDDLE are also 1,2,4...
 uint8_t bmask[3] = { 0x01, 0x02, 0x04 };
@@ -225,10 +238,10 @@ bool ps2pp_decode(uint8_t b0, uint8_t b1, uint8_t b2)
     return false;
   // mouse extra info
   if ((b0 & 0x30) == 0x0 && (b1 & 0xf0) == 0xd0) {
-    redbutton = (b2 & 0x10);
+    xtrabutton = (b2 & 0x30);
 #ifdef SERIALDEBUG
-    Serial.print("redbutton: ");
-    Serial.println((int)redbutton);
+    Serial.print("xtrabutton: ");
+    Serial.println((int)xtrabutton, HEX);
 #endif
   }
   return true;
@@ -258,6 +271,37 @@ void move(int8_t x, int8_t y, int8_t z)
   jigglecount = 0;
 }
 
+/*
+ * mstat bit 0 = 0x01 left;
+ * mstat bit 1 = 0x02 right;
+ * xtra  bit 4 = 0x10 small left on Marble T-BC21, red button on Marble FX;
+ * xtra  bit 5 = 0x20 small right on Marble T-BC21;
+ * red button will be scroll, 0x20 will be mapped to 0x04 => middle button
+ * return value: bit 0,1,2 = left, right, middle, bit 4 = scroll
+ * if lefthanded == true, then buttons will be swapped (only useful with T-BC21)
+ */
+uint8_t map_buttons(uint8_t mstat, uint8_t xtra)
+{
+  uint8_t ret = 0;
+  if (! lefthanded) {
+    ret = mstat & 0x07; /* standard left/right/middle buttons */
+    if (xtra & 0x20)
+      ret |= 0x04;
+    if (xtra & 0x10)
+      ret |= 0x10; /* scroll button */
+  } else { /* invert */
+    if (mstat & 0x01)
+      ret = 0x02;
+    if (mstat & 0x02)
+      ret |= 0x01;
+    if (xtra & 0x10)
+      ret |= 0x04;
+    if (xtra & 0x20)
+      ret |= 0x10; /* scroll button */
+  }
+  return ret;
+}
+
 void loop()
 {
   bool ret;
@@ -282,6 +326,8 @@ void loop()
   if (ps2pp_decode(mstat, mx, my) || USBDevice.isSuspended())
     return; // do nothing.
 
+  uint8_t btn = map_buttons(mstat, xtrabutton);
+  bool redbutton = btn & 0x10;
   if (redbutton) { /* translate y scroll into wheel-scroll */
     int8_t scroll = my / 8;
     if (! scroll) {
@@ -312,7 +358,7 @@ void loop()
 
   /* handle normal buttons */
   for (uint8_t i = 0; i < sizeof(buttons); i++) {
-    bool button = mstat & bmask[i];
+    bool button = btn & bmask[i];
     if (!buttons[i] && button)
       Mouse.press(bmask[i]);
     else if (buttons[i] && !button)
