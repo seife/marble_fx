@@ -13,9 +13,12 @@
  *
  *  PS2++ protocol specs from http://web.archive.org/web/20030714000535/http://dqcs.com/logitech/ps2ppspec.htm
  *
- * based on this: 
+ * based on this:
  *   Arduino Forum > Topics > Device Hacking > Logitech TrackMan Marble FX USB converter
  *   https://forum.arduino.cc/index.php?topic=365472.0
+ *
+ * SAMPLE_RATE setting idea from
+ *   https://github.com/dkao/Logitech_Trackman_Marble_FX_PS2_to_USB_converter
  *
  *  default HW setup
  *   wire PS/2 connector to arduino PIN 2 (data) and 3 (clk)
@@ -38,6 +41,13 @@
  */
 #define DATA_PIN 2
 #define CLK_PIN  3
+
+/*
+ * Set sample rate.
+ * PS/2 default sample rate is 100Hz.
+ * Valid sample rates: 10, 20, 40, 60, 80, 100, 200
+ */
+#define SAMPLE_RATE 200
 
 /* global variables */
 bool redbutton = false;
@@ -165,6 +175,12 @@ void mouse_init()
   mouse_read();  /* ack byte */
   mouse_read();  /* blank */
   mouse_read();  /* blank */
+#ifdef SAMPLE_RATE
+  mouse_write(0xf3);  /* sample rate */
+  mouse_read();  /* ack */
+  mouse_write(SAMPLE_RATE);
+  mouse_read();  /* ack */
+#endif
   mouse_write(0xf0);  /* remote mode */
   mouse_read();  /* ack */
   delayMicroseconds(100);
