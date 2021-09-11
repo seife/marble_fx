@@ -71,6 +71,13 @@ bool buttons[3] = { false, false, false };
 uint8_t bmask[3] = { 0x01, 0x02, 0x04 };
 int scroll_sum = 0;
 
+void led_invert(void)
+{
+  static bool led = HIGH; /* start with LED on */
+  digitalWrite(LED_BUILTIN, led);
+  led = !led;
+}
+
 /*
  * https://www.arduino.cc/reference/en/language/functions/digital-io/pinmode/
  * correctly set the mouse clock and data pins for
@@ -201,6 +208,7 @@ void mouse_init()
   mouse_read();  /* ack byte */
   mouse_read();  /* blank */
   mouse_read();  /* blank */
+  led_invert();  /* led off to see we passsed first init */
 #ifdef SAMPLE_RATE
   mouse_write(0xf3);  /* sample rate */
   mouse_read();  /* ack */
@@ -253,7 +261,12 @@ void setup()
 {
 #ifdef SERIALDEBUG
   Serial.begin(115200); /* baudrate does not matter */
+  delay(100);
+  while(! Serial) {};
+  Serial.println("HELLO!");
 #endif
+  pinMode(LED_BUILTIN, OUTPUT);
+  led_invert();
   mouse_init();
   ps2pp_write_magic_ping();
 #ifdef STREAM_MODE
@@ -306,6 +319,7 @@ uint8_t map_buttons(uint8_t mstat, uint8_t xtra)
 void loop()
 {
   bool ret;
+  led_invert();
 #ifndef STREAM_MODE
   mouse_write(0xeb);  /* give me data! */
   mouse_read();      /* ignore ack */
@@ -317,7 +331,6 @@ void loop()
   int8_t mx    = (int8_t)mouse_read();
   int8_t my    = (int8_t)mouse_read();
 #ifdef SERIALDEBUG
-  Serial.println();
   Serial.print((int)mstat, HEX);
   Serial.print("\t");
   Serial.print((int)mx);
