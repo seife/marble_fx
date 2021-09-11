@@ -51,6 +51,9 @@
  */
 #define DATA_PIN 2
 #define CLK_PIN  3
+/* configuration input switches */
+#define LEFTHAND_PIN 8
+#define JIGGLE_PIN   7
 
 #define STREAM_MODE
 /*
@@ -60,8 +63,7 @@
  */
 #define SAMPLE_RATE 200
 
-/* lefthanded and jiggler are right now statically defined during build
-   later they might be set to switches on digital inputs */
+/* will be set from switches on pins 7 and 8 */
 bool lefthanded = false;
 bool jiggler = true;
 /* global variables */
@@ -260,11 +262,19 @@ bool ps2pp_decode(uint8_t b0, uint8_t b1, uint8_t b2)
 /* the main() program code */
 void setup()
 {
+  pinMode(JIGGLE_PIN, INPUT_PULLUP);
+  pinMode(LEFTHAND_PIN, INPUT_PULLUP);
+  jiggler =    (digitalRead(JIGGLE_PIN) == HIGH);  /* default on if pin open */
+  lefthanded = (digitalRead(LEFTHAND_PIN) == LOW); /* default off */
 #ifdef SERIALDEBUG
   Serial.begin(115200); /* baudrate does not matter */
   delay(100);
   while(! Serial) {};
   Serial.println("HELLO!");
+  Serial.print("Jiggler:\t");
+  Serial.println(jiggler);
+  Serial.print("Lefthanded:\t");
+  Serial.println(lefthanded);
 #endif
   pinMode(LED_BUILTIN, OUTPUT);
   led_invert();
@@ -320,6 +330,10 @@ uint8_t map_buttons(uint8_t mstat, uint8_t xtra)
 void loop()
 {
   bool ret;
+  /* update the switch state.
+     Does this even make sense at run time? but it does not hurt anyway ;-) */
+  jiggler =    (digitalRead(JIGGLE_PIN) == HIGH);  /* default on if pin open */
+  lefthanded = (digitalRead(LEFTHAND_PIN) == LOW); /* default off */
   led_invert();
 #ifndef STREAM_MODE
   mouse_write(0xeb);  /* give me data! */
