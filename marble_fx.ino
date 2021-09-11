@@ -203,6 +203,7 @@ void mouse_init()
 {
   setpin(CLK_PIN, HIGH);
   setpin(DATA_PIN, HIGH);
+  delay(250);    /* allow mouse to power on */
   /* reset */
   mouse_write(0xff);
   mouse_read();  /* ack byte */
