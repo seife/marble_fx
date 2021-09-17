@@ -55,13 +55,18 @@
 #define LEFTHAND_PIN 8
 #define JIGGLE_PIN   7
 
-#define STREAM_MODE
+/* STREAM_MODE and non-standard SAMPLE_RATE are disabled by default.
+ * while it sounds useful at first glance, it results in problems when
+ * (really) fast moving the ball, and it does not give considerable
+ * benefits in standard usage etiher
+ * you can uncomment those defines to use them if you want */
+//#define STREAM_MODE
 /*
  * Set sample rate.
  * PS/2 default sample rate is 100Hz.
  * Valid sample rates: 10, 20, 40, 60, 80, 100, 200
  */
-#define SAMPLE_RATE 200
+//#define SAMPLE_RATE 200
 
 /* will be set from switches on pins 7 and 8 */
 bool lefthanded = false;
