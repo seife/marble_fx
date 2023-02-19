@@ -5,8 +5,17 @@ if [ -z "$BOARD" ]; then
 	exit 1
 fi
 
+### configuration goes here
+# use legacy HID code ("Mouse.h") instead of (IMHO) better HID-Project.h
+# from https://github.com/NicoHood/HID
+CONFIG_USE_LEGACYHID=${CONFIG_USE_LEGACYHID:-false}
+
+
 declare -a props
 props=( --build-property compiler.cpp.extra_flags=-DUSB_CONFIG_POWER=50 )
+if $CONFIG_USE_LEGACYHID; then
+	props+=( --build-property compiler.cpp.extra_flags=-DUSE_LEGACY_HID )
+fi
 if [ "$1" == "custom" ]; then
 	shift
 	props+=( --build-property build.usb_manufacturer='"seife"' )

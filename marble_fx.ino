@@ -23,6 +23,9 @@
  * SAMPLE_RATE and STREAM_MODE setting idea from
  *   https://github.com/dkao/Logitech_Trackman_Marble_FX_PS2_to_USB_converter
  *
+ * depends on these libraries:
+ *   HID-Project (https://github.com/NicoHood/HID)
+ *
  * The T-BC21 trackball has four buttons. It has an USB cable, but can also speak PS/2
  * We use the PS/2 mode
  *
@@ -44,7 +47,11 @@
 
 //# define SERIALDEBUG 1
 
+#ifdef USE_LEGACY_HID
 #include "Mouse.h"
+#else
+#include "HID-Project.h"
+#endif
 
 /*
  * Pin definitions
