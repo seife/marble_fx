@@ -53,6 +53,7 @@
 #include "HID-Project.h"
 #endif
 
+#include <avr/wdt.h>
 /*
  * Pin definitions
  */
@@ -107,10 +108,29 @@ void setpin(int pin, bool value)
   }
 }
 
+bool die_if_timeout(long start, bool *ret = NULL)
+{
+  long timeout;
+#ifdef STREAM_MODE
+    timeout = 500;
+#else
+    timeout = 5000;
+#endif
+  if ((millis() - start) < timeout)
+    return false;
+  if (ret) {
+    *ret = false;
+    return true;
+  }
+  wdt_enable(WDTO_30MS);
+  while(true) {} ;
+}
+
 void mouse_write(uint8_t data)
 {
   uint8_t i;
   uint8_t parity = 1;
+  long start = millis();
 
   /* put pins in output mode */
   setpin(DATA_PIN, HIGH);
@@ -124,7 +144,7 @@ void mouse_write(uint8_t data)
   setpin(CLK_PIN, HIGH);
   /* wait for mouse to take control of clock); */
   while (digitalRead(CLK_PIN) == HIGH)
-    ;
+    die_if_timeout(start);
   /* clock is low, and we are clear to send data */
   for (i=0; i < 8; i++) {
     if (data & 0x01) {
@@ -134,26 +154,26 @@ void mouse_write(uint8_t data)
     }
     /* wait for clock cycle */
     while (digitalRead(CLK_PIN) == LOW)
-      ;
+      die_if_timeout(start);
     while (digitalRead(CLK_PIN) == HIGH)
-      ;
+      die_if_timeout(start);
     parity = parity ^ (data & 0x01);
     data >>= 1;
   }
   /* parity */
   setpin(DATA_PIN, parity);
   while (digitalRead(CLK_PIN) == LOW)
-    ;
+    die_if_timeout(start);
   while (digitalRead(CLK_PIN) == HIGH)
-    ;
+    die_if_timeout(start);
   /* stop bit */
   setpin(DATA_PIN, HIGH);
   delayMicroseconds(50);
   while (digitalRead(CLK_PIN) == HIGH)
-    ;
+    die_if_timeout(start);
   /* wait for mouse to switch modes */
   while ((digitalRead(CLK_PIN) == LOW) || (digitalRead(DATA_PIN) == LOW))
-    ;
+    die_if_timeout(start);
   /* put a hold on the incoming data. */
   setpin(CLK_PIN, LOW);
 }
@@ -178,34 +198,46 @@ uint8_t mouse_read(bool *ret = NULL)
   delayMicroseconds(50);
   long start = millis();
   while (digitalRead(CLK_PIN) == HIGH) {
-    if (ret && (millis() - start) > 1000) {
-       *ret = false;
-       goto out;
-    }
+    if (die_if_timeout(start, ret))
+      goto out;
   }
   delayMicroseconds(5);               /* debounce */
-  while (digitalRead(CLK_PIN) == LOW) /* eat start bit */
-    ;
+  while (digitalRead(CLK_PIN) == LOW) { /* eat start bit */
+    if (die_if_timeout(start, ret))
+      goto out;
+  }
   for (i=0; i < 8; i++) {
-    while (digitalRead(CLK_PIN) == HIGH)
-      ;
+    while (digitalRead(CLK_PIN) == HIGH) {
+      if (die_if_timeout(start, ret))
+        goto out;
+    }
     if (digitalRead(DATA_PIN) == HIGH) {
       data = data | bit;
     }
-    while (digitalRead(CLK_PIN) == LOW)
-      ;
+    while (digitalRead(CLK_PIN) == LOW) {
+      if (die_if_timeout(start, ret))
+        goto out;
+    }
     bit <<= 1;
   }
   /* eat parity bit, (ignored) */
-  while (digitalRead(CLK_PIN) == HIGH)
-    ;
-  while (digitalRead(CLK_PIN) == LOW)
-    ;
+  while (digitalRead(CLK_PIN) == HIGH) {
+    if (die_if_timeout(start, ret))
+      goto out;
+  }
+  while (digitalRead(CLK_PIN) == LOW) {
+    if (die_if_timeout(start, ret))
+      goto out;
+  }
   /* eat stop bit */
-  while (digitalRead(CLK_PIN) == HIGH)
-    ;
-  while (digitalRead(CLK_PIN) == LOW)
-    ;
+  while (digitalRead(CLK_PIN) == HIGH) {
+    if (die_if_timeout(start, ret))
+      goto out;
+  }
+  while (digitalRead(CLK_PIN) == LOW) {
+    if (die_if_timeout(start, ret))
+      goto out;
+  }
 
 out:
   /* stop incoming data. */
