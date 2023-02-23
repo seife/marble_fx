@@ -24,7 +24,8 @@
  *   https://github.com/dkao/Logitech_Trackman_Marble_FX_PS2_to_USB_converter
  *
  * depends on these libraries:
- *   HID-Project (https://github.com/NicoHood/HID)
+ *   HID-Project  (https://github.com/NicoHood/HID, install via library manager)
+ *   Arduino-GPIO (https://github.com/mikaelpatel/Arduino-GPIO, install from source)
  *
  * The T-BC21 trackball has four buttons. It has an USB cable, but can also speak PS/2
  * We use the PS/2 mode
@@ -52,6 +53,7 @@
 #else
 #include "HID-Project.h"
 #endif
+#include "GPIO.h"
 
 #include <avr/wdt.h>
 /*
@@ -62,6 +64,20 @@
 /* configuration input switches */
 #define LEFTHAND_PIN 8
 #define JIGGLE_PIN   7
+
+/* int2board(CLK_PIN) == BOARD::D3 */
+#define B_CONCAT(x) BOARD::D##x
+#define int2board(x) B_CONCAT(x)
+
+GPIO<int2board(DATA_PIN)>     pin_DATA;
+GPIO<int2board(CLK_PIN)>      pin_CLK;
+GPIO<int2board(LEFTHAND_PIN)> pin_LEFTHAND;
+GPIO<int2board(JIGGLE_PIN)>   pin_JIGGLE;
+GPIO<int2board(LED_BUILTIN)>  pin_LED;
+
+#define pin_high(PIN) do { PIN.input().pullup(); } while (0)
+#define pin_low(PIN)  do { PIN.output(); PIN.low(); } while (0)
+#define pin_set(PIN, STATE) do { if (STATE) pin_high(PIN); else pin_low(PIN); } while (0)
 
 /* and non-standard SAMPLE_RATE setting is disabled by default.
  * while it sounds useful at first glance, it results in problems when
@@ -87,18 +103,13 @@ int scroll_sum = 0;
 
 bool stream_mode = false;
 
-void led_invert(void)
-{
-  static bool led = HIGH; /* start with LED on */
-  digitalWrite(LED_BUILTIN, led);
-  led = !led;
-}
 
 /*
  * https://www.arduino.cc/reference/en/language/functions/digital-io/pinmode/
  * correctly set the mouse clock and data pins for
  * various conditions.
  */
+#if 0
 void setpin(int pin, bool value)
 {
   if (value) {
@@ -108,6 +119,7 @@ void setpin(int pin, bool value)
     digitalWrite(pin, LOW);
   }
 }
+#endif
 
 bool die_if_timeout(long start, bool *ret = NULL)
 {
@@ -134,49 +146,46 @@ void mouse_write(uint8_t data)
   long start = millis();
 
   /* put pins in output mode */
-  setpin(DATA_PIN, HIGH);
-  setpin(CLK_PIN, HIGH);
+  pin_high(pin_DATA);
+  pin_high(pin_CLK);
   delayMicroseconds(300);
-  setpin(CLK_PIN, LOW);
+  pin_low(pin_CLK);
   delayMicroseconds(300);
-  setpin(DATA_PIN, LOW);
+  pin_low(pin_DATA);
   delayMicroseconds(10);
   /* start bit */
-  setpin(CLK_PIN, HIGH);
+  pin_high(pin_CLK);
+  delayMicroseconds(10); /* Arduino-GPIO is too fast, so wait until CLK is actually high */
   /* wait for mouse to take control of clock); */
-  while (digitalRead(CLK_PIN) == HIGH)
+  while (pin_CLK)
     die_if_timeout(start);
   /* clock is low, and we are clear to send data */
   for (i=0; i < 8; i++) {
-    if (data & 0x01) {
-      setpin(DATA_PIN, HIGH);
-    } else {
-      setpin(DATA_PIN, LOW);
-    }
+    pin_set(pin_DATA, (data & 1));
     /* wait for clock cycle */
-    while (digitalRead(CLK_PIN) == LOW)
+    while (!pin_CLK)
       die_if_timeout(start);
-    while (digitalRead(CLK_PIN) == HIGH)
+    while (pin_CLK)
       die_if_timeout(start);
     parity = parity ^ (data & 0x01);
     data >>= 1;
   }
   /* parity */
-  setpin(DATA_PIN, parity);
-  while (digitalRead(CLK_PIN) == LOW)
+  pin_set(pin_DATA, parity);
+  while (!pin_CLK)
     die_if_timeout(start);
-  while (digitalRead(CLK_PIN) == HIGH)
+  while (pin_CLK)
     die_if_timeout(start);
   /* stop bit */
-  setpin(DATA_PIN, HIGH);
+  pin_high(pin_DATA);
   delayMicroseconds(50);
-  while (digitalRead(CLK_PIN) == HIGH)
+  while (pin_CLK)
     die_if_timeout(start);
   /* wait for mouse to switch modes */
-  while ((digitalRead(CLK_PIN) == LOW) || (digitalRead(DATA_PIN) == LOW))
+  while (! pin_CLK || ! pin_DATA)
     die_if_timeout(start);
   /* put a hold on the incoming data. */
-  setpin(CLK_PIN, LOW);
+  pin_low(pin_CLK);
 }
 
 /*
@@ -194,69 +203,68 @@ uint8_t mouse_read(bool *ret = NULL)
 
   if (ret)
     *ret = true;
-  setpin(CLK_PIN, HIGH);
-  setpin(DATA_PIN, HIGH);
+  pin_high(pin_CLK);
+  pin_high(pin_DATA);
   delayMicroseconds(50);
   long start = millis();
-  while (digitalRead(CLK_PIN) == HIGH) {
+  while (pin_CLK) {
     if (die_if_timeout(start, ret))
       goto out;
   }
-  delayMicroseconds(5);               /* debounce */
-  while (digitalRead(CLK_PIN) == LOW) { /* eat start bit */
+  while (! pin_CLK) { /* eat start bit */
     if (die_if_timeout(start, ret))
       goto out;
   }
   for (i=0; i < 8; i++) {
-    while (digitalRead(CLK_PIN) == HIGH) {
+    while (pin_CLK) {
       if (die_if_timeout(start, ret))
         goto out;
     }
-    if (digitalRead(DATA_PIN) == HIGH) {
+    if (pin_DATA) {
       data = data | bit;
     }
-    while (digitalRead(CLK_PIN) == LOW) {
+    while (! pin_CLK) {
       if (die_if_timeout(start, ret))
         goto out;
     }
     bit <<= 1;
   }
   /* eat parity bit, (ignored) */
-  while (digitalRead(CLK_PIN) == HIGH) {
+  while (pin_CLK) {
     if (die_if_timeout(start, ret))
       goto out;
   }
-  while (digitalRead(CLK_PIN) == LOW) {
+  while (!pin_CLK) {
     if (die_if_timeout(start, ret))
       goto out;
   }
   /* eat stop bit */
-  while (digitalRead(CLK_PIN) == HIGH) {
+  while (pin_CLK) {
     if (die_if_timeout(start, ret))
       goto out;
   }
-  while (digitalRead(CLK_PIN) == LOW) {
+  while (!pin_CLK) {
     if (die_if_timeout(start, ret))
       goto out;
   }
 
 out:
   /* stop incoming data. */
-  setpin(CLK_PIN, LOW);
+  pin_low(pin_CLK);
   return data;
 }
 
 void mouse_init()
 {
-  setpin(CLK_PIN, HIGH);
-  setpin(DATA_PIN, HIGH);
+  pin_high(pin_CLK);
+  pin_high(pin_DATA);
   delay(250);    /* allow mouse to power on */
   /* reset */
   mouse_write(0xff);
   mouse_read();  /* ack byte */
   mouse_read();  /* blank */
   mouse_read();  /* blank */
-  led_invert();  /* led off to see we passsed first init */
+  pin_LED.toggle();  /* led off to see we passsed first init */
 #ifdef SAMPLE_RATE
   mouse_write(0xf3);  /* sample rate */
   mouse_read();  /* ack */
@@ -307,10 +315,12 @@ bool ps2pp_decode(uint8_t b0, uint8_t b1, uint8_t b2)
 /* the main() program code */
 void setup()
 {
-  pinMode(JIGGLE_PIN, INPUT_PULLUP);
-  pinMode(LEFTHAND_PIN, INPUT_PULLUP);
-  jiggler =    (digitalRead(JIGGLE_PIN) == HIGH);  /* default on if pin open */
-  lefthanded = (digitalRead(LEFTHAND_PIN) == LOW); /* default off */
+  pin_low(pin_DATA);
+  pin_low(pin_CLK);
+  pin_JIGGLE.input().pullup();
+  pin_LEFTHAND.input().pullup();
+  jiggler =    pin_JIGGLE;    /* default on if pin open */
+  lefthanded = !pin_LEFTHAND; /* default off */
 #ifdef SERIALDEBUG
   Serial.begin(115200); /* baudrate does not matter */
   delay(100);
@@ -321,8 +331,8 @@ void setup()
   Serial.print("Lefthanded:\t");
   Serial.println(lefthanded);
 #endif
-  pinMode(LED_BUILTIN, OUTPUT);
-  led_invert();
+  pin_LED.output();
+  pin_LED.high();
   mouse_init();
   ps2pp_write_magic_ping();
   if (stream_mode)
@@ -376,9 +386,9 @@ void loop()
   bool ret;
   /* update the switch state.
      Does this even make sense at run time? but it does not hurt anyway ;-) */
-  jiggler =    (digitalRead(JIGGLE_PIN) == HIGH);  /* default on if pin open */
-  lefthanded = (digitalRead(LEFTHAND_PIN) == LOW); /* default off */
-  led_invert();
+  jiggler =    pin_JIGGLE;    /* default on if pin open */
+  lefthanded = !pin_LEFTHAND; /* default off */
+  pin_LED.toggle();
   if (!stream_mode) {
     mouse_write(0xeb);  /* give me data! */
     mouse_read();      /* ignore ack */
