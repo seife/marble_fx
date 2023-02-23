@@ -231,9 +231,9 @@ void mouse_init()
   mouse_read();  /* ack */
 #endif
 #ifndef STREAM_MODE
-  mouse_write(0xf0);  /* remote mode */
-  mouse_read();  /* ack */
-  delayMicroseconds(100);
+    mouse_write(0xf0);  /* remote mode */
+    mouse_read();  /* ack */
+    delayMicroseconds(100);
 #endif
 }
 
@@ -293,7 +293,7 @@ void setup()
   mouse_init();
   ps2pp_write_magic_ping();
 #ifdef STREAM_MODE
-  mouse_enable_report();
+    mouse_enable_report();
 #endif
   Mouse.begin();
 }
@@ -348,67 +348,67 @@ void loop()
   lefthanded = (digitalRead(LEFTHAND_PIN) == LOW); /* default off */
   led_invert();
 #ifndef STREAM_MODE
-  mouse_write(0xeb);  /* give me data! */
-  mouse_read();      /* ignore ack */
+    mouse_write(0xeb);  /* give me data! */
+    mouse_read();      /* ignore ack */
 #endif
   uint8_t mstat = mouse_read(&ret);
 #ifdef STREAM_MODE
   if (ret) { /* no timeout */
 #endif
-  int8_t mx    = (int8_t)mouse_read();
-  int8_t my    = (int8_t)mouse_read();
+    int8_t mx    = (int8_t)mouse_read();
+    int8_t my    = (int8_t)mouse_read();
 #ifdef SERIALDEBUG
-  Serial.print((int)mstat, HEX);
-  Serial.print("\t");
-  Serial.print((int)mx);
-  Serial.print("\t");
-  Serial.println((int)my);
+    Serial.print((int)mstat, HEX);
+    Serial.print("\t");
+    Serial.print((int)mx);
+    Serial.print("\t");
+    Serial.println((int)my);
 #endif
-  if (ps2pp_decode(mstat, mx, my) || USBDevice.isSuspended())
-    return; // do nothing.
+    if (ps2pp_decode(mstat, mx, my) || USBDevice.isSuspended())
+      return; // do nothing.
 
-  uint8_t btn = map_buttons(mstat, xtrabutton);
-  bool redbutton = btn & 0x10;
-  if (redbutton) { /* translate y scroll into wheel-scroll */
-    int8_t scroll = my / 8;
-    if (! scroll) {
-      scroll_sum += my;
-      scroll = scroll_sum / 8;
-    }
-    if (scroll != 0) {
+    uint8_t btn = map_buttons(mstat, xtrabutton);
+    bool redbutton = btn & 0x10;
+    if (redbutton) { /* translate y scroll into wheel-scroll */
+      int8_t scroll = my / 8;
+      if (! scroll) {
+        scroll_sum += my;
+        scroll = scroll_sum / 8;
+      }
+      if (scroll != 0) {
+        scroll_sum = 0;
+#ifdef SERIALDEBUG
+        Serial.print("SCRL ");
+        Serial.println((int)scroll);
+#endif
+        move(0, 0, scroll);
+      }
+    } else {
+      /* -my to get the direction right... */
+      if (mx != 0 || my != 0) {
+        move(mx, -my, 0);
+#ifdef SERIALDEBUG
+        Serial.print("MOVE ");
+        Serial.print((int)mx);
+        Serial.print(" ");
+        Serial.println((int)my);
+#endif
+      }
       scroll_sum = 0;
-#ifdef SERIALDEBUG
-      Serial.print("SCRL ");
-      Serial.println((int)scroll);
-#endif
-      move(0, 0, scroll);
     }
-  } else {
-    /* -my to get the direction right... */
-    if (mx != 0 || my != 0) {
-      move(mx, -my, 0);
-#ifdef SERIALDEBUG
-      Serial.print("MOVE ");
-      Serial.print((int)mx);
-      Serial.print(" ");
-      Serial.println((int)my);
-#endif
-    }
-    scroll_sum = 0;
-  }
 
-  /* handle normal buttons */
-  for (uint8_t i = 0; i < sizeof(buttons); i++) {
-    bool button = btn & bmask[i];
-    if (!buttons[i] && button)
-      Mouse.press(bmask[i]);
-    else if (buttons[i] && !button)
-      Mouse.release(bmask[i]);
-    buttons[i] = button;
-  }
+    /* handle normal buttons */
+    for (uint8_t i = 0; i < sizeof(buttons); i++) {
+      bool button = btn & bmask[i];
+      if (!buttons[i] && button)
+        Mouse.press(bmask[i]);
+      else if (buttons[i] && !button)
+        Mouse.release(bmask[i]);
+      buttons[i] = button;
+    }
 
 #ifndef STREAM_MODE
-  delay(20);
+      delay(20);
 #endif
 #ifdef STREAM_MODE
   }
