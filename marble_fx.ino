@@ -20,7 +20,7 @@
  *   Arduino Forum > Topics > Device Hacking > Logitech TrackMan Marble FX USB converter
  *   https://forum.arduino.cc/index.php?topic=365472.0
  *
- * SAMPLE_RATE and STREAM_MODE setting idea from
+ * SAMPLE_RATE and stream_mode setting idea from
  *   https://github.com/dkao/Logitech_Trackman_Marble_FX_PS2_to_USB_converter
  *
  * depends on these libraries:
@@ -63,13 +63,12 @@
 #define LEFTHAND_PIN 8
 #define JIGGLE_PIN   7
 
-/* STREAM_MODE and non-standard SAMPLE_RATE are disabled by default.
+/* and non-standard SAMPLE_RATE setting is disabled by default.
  * while it sounds useful at first glance, it results in problems when
  * (really) fast moving the ball, and it does not give considerable
  * benefits in standard usage etiher
- * you can uncomment those defines to use them if you want */
-//#define STREAM_MODE
-/*
+ * you can uncomment this define to use it if you want
+ *
  * Set sample rate.
  * PS/2 default sample rate is 100Hz.
  * Valid sample rates: 10, 20, 40, 60, 80, 100, 200
@@ -85,6 +84,8 @@ bool buttons[3] = { false, false, false };
 // lucky us, the definitions of MOUSE_LEFT,_RIGHT,_MIDDLE are also 1,2,4...
 uint8_t bmask[3] = { 0x01, 0x02, 0x04 };
 int scroll_sum = 0;
+
+bool stream_mode = false;
 
 void led_invert(void)
 {
@@ -111,11 +112,11 @@ void setpin(int pin, bool value)
 bool die_if_timeout(long start, bool *ret = NULL)
 {
   long timeout;
-#ifdef STREAM_MODE
+  if (stream_mode)
     timeout = 500;
-#else
+  else
     timeout = 5000;
-#endif
+
   if ((millis() - start) < timeout)
     return false;
   if (ret) {
@@ -262,11 +263,11 @@ void mouse_init()
   mouse_write(SAMPLE_RATE);
   mouse_read();  /* ack */
 #endif
-#ifndef STREAM_MODE
+  if (!stream_mode) {
     mouse_write(0xf0);  /* remote mode */
     mouse_read();  /* ack */
     delayMicroseconds(100);
-#endif
+  }
 }
 
 void mouse_enable_report()
@@ -324,9 +325,8 @@ void setup()
   led_invert();
   mouse_init();
   ps2pp_write_magic_ping();
-#ifdef STREAM_MODE
+  if (stream_mode)
     mouse_enable_report();
-#endif
   Mouse.begin();
 }
 
@@ -379,14 +379,13 @@ void loop()
   jiggler =    (digitalRead(JIGGLE_PIN) == HIGH);  /* default on if pin open */
   lefthanded = (digitalRead(LEFTHAND_PIN) == LOW); /* default off */
   led_invert();
-#ifndef STREAM_MODE
+  if (!stream_mode) {
     mouse_write(0xeb);  /* give me data! */
     mouse_read();      /* ignore ack */
-#endif
+  }
   uint8_t mstat = mouse_read(&ret);
-#ifdef STREAM_MODE
-  if (ret) { /* no timeout */
-#endif
+
+  if (ret || !stream_mode) { /* no timeout */
     int8_t mx    = (int8_t)mouse_read();
     int8_t my    = (int8_t)mouse_read();
 #ifdef SERIALDEBUG
@@ -439,12 +438,9 @@ void loop()
       buttons[i] = button;
     }
 
-#ifndef STREAM_MODE
+    if (!stream_mode)
       delay(20);
-#endif
-#ifdef STREAM_MODE
   }
-#endif
   if (! jiggler)
     return;
 
