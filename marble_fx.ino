@@ -139,6 +139,16 @@ bool die_if_timeout(long start, bool *ret = NULL)
   while(true) {} ;
 }
 
+void send_bit(unsigned long start, bool data)
+{
+  pin_set(pin_DATA, data);
+  /* wait for clock cycle */
+  while (!pin_CLK)
+    die_if_timeout(start);
+  while (pin_CLK)
+    die_if_timeout(start);
+}
+
 void mouse_write(uint8_t data)
 {
   uint8_t i;
@@ -161,21 +171,12 @@ void mouse_write(uint8_t data)
     die_if_timeout(start);
   /* clock is low, and we are clear to send data */
   for (i=0; i < 8; i++) {
-    pin_set(pin_DATA, (data & 1));
-    /* wait for clock cycle */
-    while (!pin_CLK)
-      die_if_timeout(start);
-    while (pin_CLK)
-      die_if_timeout(start);
+    send_bit(start, data & 1);
     parity = parity ^ (data & 0x01);
     data >>= 1;
   }
   /* parity */
-  pin_set(pin_DATA, parity);
-  while (!pin_CLK)
-    die_if_timeout(start);
-  while (pin_CLK)
-    die_if_timeout(start);
+  send_bit(start, parity);
   /* stop bit */
   pin_high(pin_DATA);
   delayMicroseconds(50);
