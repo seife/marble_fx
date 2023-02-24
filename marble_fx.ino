@@ -316,6 +316,7 @@ bool ps2pp_decode(uint8_t b0, uint8_t b1, uint8_t b2)
 /* the main() program code */
 void setup()
 {
+  Mouse.begin(); /* does not actually "begin" anything but defines USB descriptors */
   pin_low(pin_DATA);
   pin_low(pin_CLK);
   pin_JIGGLE.input().pullup();
@@ -338,7 +339,6 @@ void setup()
   ps2pp_write_magic_ping();
   if (stream_mode)
     mouse_enable_report();
-  Mouse.begin();
 }
 
 long last_move = 0;
