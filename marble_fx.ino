@@ -115,23 +115,6 @@ int scroll_sum = 0;
 bool stream_mode = false;
 
 
-/*
- * https://www.arduino.cc/reference/en/language/functions/digital-io/pinmode/
- * correctly set the mouse clock and data pins for
- * various conditions.
- */
-#if 0
-void setpin(int pin, bool value)
-{
-  if (value) {
-    pinMode(pin, INPUT_PULLUP);
-  } else {
-    pinMode(pin, OUTPUT);
-    digitalWrite(pin, LOW);
-  }
-}
-#endif
-
 void bus_idle(void)
 {
   pin_high(pin_DATA);
