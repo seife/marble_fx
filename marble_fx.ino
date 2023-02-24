@@ -23,6 +23,9 @@
  * SAMPLE_RATE and stream_mode setting idea from
  *   https://github.com/dkao/Logitech_Trackman_Marble_FX_PS2_to_USB_converter
  *
+ * interrupt routines inspired by the qmk firmware:
+ *   https://github.com/qmk/qmk_firmware
+ *
  * depends on these libraries:
  *   HID-Project  (https://github.com/NicoHood/HID, install via library manager)
  *   Arduino-GPIO (https://github.com/mikaelpatel/Arduino-GPIO, install from source)
@@ -48,6 +51,8 @@
 
 //# define SERIALDEBUG 1
 //# define LED_DEBUG
+
+#define USE_INTERRUPT
 
 #ifdef USE_LEGACY_HID
 #include "Mouse.h"
@@ -114,6 +119,102 @@ int scroll_sum = 0;
 
 bool stream_mode = false;
 
+#ifdef USE_INTERRUPT
+const uint8_t clk_interrupt = digitalPinToInterrupt(3);
+uint8_t ps2_error = 0;
+
+/* ring buffer for received bytes */
+#define MBUF_SIZE 16
+uint8_t mbuf[MBUF_SIZE];
+uint8_t mbuf_h = 0;
+uint8_t mbuf_t = 0;
+void mbuf_push(uint8_t data)
+{
+  uint8_t sreg = SREG;
+  cli();
+  uint8_t next = (mbuf_h + 1) % MBUF_SIZE;
+  if (next != mbuf_t) {
+    mbuf[mbuf_h] = data;
+    mbuf_h = next;
+  }
+  SREG = sreg;
+}
+
+uint8_t mbuf_pull(void)
+{
+  uint8_t ret = 0;
+  uint8_t sreg = SREG;
+  cli();
+  if (mbuf_h != mbuf_t) {
+    ret = mbuf[mbuf_t];
+    mbuf_t = (mbuf_t + 1) % MBUF_SIZE;
+  }
+  SREG = sreg;
+  return ret;
+}
+
+bool mbuf_empty(void)
+{
+  uint8_t sreg = SREG;
+  cli();
+  bool ret = (mbuf_h == mbuf_t);
+  SREG = sreg;
+  return ret;
+}
+
+enum {
+  NONE, START,
+  BIT0, BIT1, BIT2, BIT3, BIT4, BIT5, BIT6, BIT7,
+  PARITY, STOP
+};
+
+void ps2_ISR(void)
+{
+  static uint8_t bit = NONE;
+  static uint8_t data = 0;
+  static bool parity = false;
+
+  if (pin_CLK) /* ???, we trigger on FALLING */
+    return;
+
+  bit++;
+  switch (bit) {
+    case START:
+      if (pin_DATA)
+        goto error;
+      break;
+    case BIT0...BIT7:
+      data >>= 1;
+      if (pin_DATA) {
+        data |= 0x80;
+        parity = parity ^ 1;
+      }
+      break;
+    case PARITY:
+      if (pin_DATA == parity)
+        goto error;
+      break;
+    case STOP:
+      if (!pin_DATA)
+        goto error;
+      mbuf_push(data);
+      DBG(pin_LED1, low());
+      goto done;
+      break;
+    default:
+      goto error;
+  }
+  return;
+error:
+  ps2_error = bit;
+  DBG(pin_LED1, high());
+done:
+  bit = NONE;
+  data = 0;
+  parity = false;
+  return;
+}
+#endif
 
 void bus_idle(void)
 {
@@ -165,6 +266,9 @@ void mouse_write(uint8_t data)
   uint8_t parity = 1;
   unsigned long start = millis();
 
+#ifdef USE_INTERRUPT
+  detachInterrupt(clk_interrupt);
+#endif
   /* put pins in output mode */
   bus_idle();
   delayMicroseconds(300);
@@ -195,15 +299,45 @@ void mouse_write(uint8_t data)
   /* wait for mouse to switch modes */
   while (! pin_CLK || ! pin_DATA)
     die_if_timeout(start);
+  DBG(pin_LED1, low());
+#ifdef USE_INTERRUPT
+  bus_idle();             /* enable incoming data, will be handled by ISR */
+  delayMicroseconds(10);  /* to allow pin_CLK to settle */
+  attachInterrupt(clk_interrupt, ps2_ISR, FALLING);
+#else
   /* put a hold on the incoming data. */
   pin_low(pin_CLK);
-  DBG(pin_LED1, low());
+#endif
 }
 
+#ifdef USE_INTERRUPT
+/*
+ * interrupt version of mouse_read():
+ * wait for max ~50ms for ringbuffer to fill, then
+ * fetch one byte from the ringbuffer (or return error)
+ * actual read from mouse is done in the ISR
+ * if *ret != NULL it will contain the return state (false = timeout)
+ */
+uint8_t mouse_read(bool *ret = NULL)
+{
+  uint8_t retry = 50;
+  while (retry-- && mbuf_empty())
+    delay(1);
+  DBG(pin_LED2, high());
+  if (mbuf_empty()) {
+    if (ret)
+      *ret = false;
+    DBG(pin_LED2, low());
+    return 0;
+  }
+  if (ret)
+    *ret = true;
+  return mbuf_pull();
+}
+#else
 /*
  * Get a byte of data from the mouse
  * ret is the return code (true if data was delivered, false if timeout)
- * timeout is 1000 millis
  * timeout reporting is needed so that we can block in stream mode, but
  * the mouse jiggler can still do its job ;-)
  */
@@ -266,6 +400,7 @@ out:
   DBG(pin_LED2, low());
   return data;
 }
+#endif
 
 void mouse_init()
 {
