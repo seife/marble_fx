@@ -121,6 +121,12 @@ void setpin(int pin, bool value)
 }
 #endif
 
+void bus_idle(void)
+{
+  pin_high(pin_DATA);
+  pin_high(pin_CLK);
+}
+
 bool die_if_timeout(long start, bool *ret = NULL)
 {
   long timeout;
@@ -156,8 +162,7 @@ void mouse_write(uint8_t data)
   long start = millis();
 
   /* put pins in output mode */
-  pin_high(pin_DATA);
-  pin_high(pin_CLK);
+  bus_idle();
   delayMicroseconds(300);
   pin_low(pin_CLK);
   delayMicroseconds(300);
@@ -204,8 +209,7 @@ uint8_t mouse_read(bool *ret = NULL)
 
   if (ret)
     *ret = true;
-  pin_high(pin_CLK);
-  pin_high(pin_DATA);
+  bus_idle();
   delayMicroseconds(50);
   long start = millis();
   while (pin_CLK) {
@@ -257,8 +261,7 @@ out:
 
 void mouse_init()
 {
-  pin_high(pin_CLK);
-  pin_high(pin_DATA);
+  bus_idle();
   delay(250);    /* allow mouse to power on */
   /* reset */
   mouse_write(0xff);
