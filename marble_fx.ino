@@ -308,6 +308,14 @@ void ps2pp_write_magic_ping()
     mouse_write(magic[i]);
 }
 
+void mouse_setup(void)
+{
+  mouse_init();
+  ps2pp_write_magic_ping();
+  if (stream_mode)
+    mouse_enable_report();
+}
+
 bool ps2pp_decode(uint8_t b0, uint8_t b1, uint8_t b2)
 {
   /* values from linux/drivers/input/mouse/logips2pp.c */
@@ -350,10 +358,7 @@ void setup()
   DBG(pin_LED2, output());
   DBG(pin_LED1, low());
   DBG(pin_LED2, low());
-  mouse_init();
-  ps2pp_write_magic_ping();
-  if (stream_mode)
-    mouse_enable_report();
+  mouse_setup();
 }
 
 long last_move = 0;
