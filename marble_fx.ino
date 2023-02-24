@@ -47,6 +47,7 @@
  */
 
 //# define SERIALDEBUG 1
+//# define LED_DEBUG
 
 #ifdef USE_LEGACY_HID
 #include "Mouse.h"
@@ -74,6 +75,16 @@ GPIO<int2board(CLK_PIN)>      pin_CLK;
 GPIO<int2board(LEFTHAND_PIN)> pin_LEFTHAND;
 GPIO<int2board(JIGGLE_PIN)>   pin_JIGGLE;
 GPIO<int2board(LED_BUILTIN)>  pin_LED;
+
+#ifdef LED_DEBUG
+#define LED1_PIN 10
+#define LED2_PIN 11
+GPIO<int2board(LED1_PIN)> pin_LED1;
+GPIO<int2board(LED2_PIN)> pin_LED2;
+#define DBG(PIN, FUNC) do { PIN.FUNC; } while (0)
+#else
+#define DBG(PIN, FUNC) do {} while (0)
+#endif
 
 #define pin_high(PIN) do { PIN.input().pullup(); } while (0)
 #define pin_low(PIN)  do { PIN.output(); PIN.low(); } while (0)
@@ -141,6 +152,16 @@ bool die_if_timeout(long start, bool *ret = NULL)
     *ret = false;
     return true;
   }
+#ifdef LED_DEBUG
+  /* signal the error reset with one second flashing debug LEDs */
+  DBG(pin_LED2, high());
+  DBG(pin_LED1, low());
+  for (int i = 0; i < 10; i++) {
+    delay(100);
+    DBG(pin_LED1, toggle());
+    DBG(pin_LED2, toggle());
+  }
+#endif
   wdt_enable(WDTO_30MS);
   while(true) {} ;
 }
@@ -168,6 +189,7 @@ void mouse_write(uint8_t data)
   delayMicroseconds(300);
   pin_low(pin_DATA);
   delayMicroseconds(10);
+  DBG(pin_LED1, high());
   /* start bit */
   pin_high(pin_CLK);
   delayMicroseconds(10); /* Arduino-GPIO is too fast, so wait until CLK is actually high */
@@ -192,6 +214,7 @@ void mouse_write(uint8_t data)
     die_if_timeout(start);
   /* put a hold on the incoming data. */
   pin_low(pin_CLK);
+  DBG(pin_LED1, low());
 }
 
 /*
@@ -216,6 +239,7 @@ uint8_t mouse_read(bool *ret = NULL)
     if (die_if_timeout(start, ret))
       goto out;
   }
+  DBG(pin_LED2, high());
   while (! pin_CLK) { /* eat start bit */
     if (die_if_timeout(start, ret))
       goto out;
@@ -256,6 +280,7 @@ uint8_t mouse_read(bool *ret = NULL)
 out:
   /* stop incoming data. */
   pin_low(pin_CLK);
+  DBG(pin_LED2, low());
   return data;
 }
 
@@ -338,6 +363,10 @@ void setup()
 #endif
   pin_LED.output();
   pin_LED.high();
+  DBG(pin_LED1, output());
+  DBG(pin_LED2, output());
+  DBG(pin_LED1, low());
+  DBG(pin_LED2, low());
   mouse_init();
   ps2pp_write_magic_ping();
   if (stream_mode)
