@@ -138,9 +138,9 @@ void bus_idle(void)
   pin_high(pin_CLK);
 }
 
-bool die_if_timeout(long start, bool *ret = NULL)
+bool die_if_timeout(unsigned long start, bool *ret = NULL)
 {
-  long timeout;
+  unsigned long timeout;
   if (stream_mode)
     timeout = 500;
   else
@@ -180,7 +180,7 @@ void mouse_write(uint8_t data)
 {
   uint8_t i;
   uint8_t parity = 1;
-  long start = millis();
+  unsigned long start = millis();
 
   /* put pins in output mode */
   bus_idle();
