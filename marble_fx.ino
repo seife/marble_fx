@@ -255,49 +255,48 @@ void bus_stop(void)
   pin_high(pin_DATA);
 }
 
-bool die_if_timeout(unsigned long start, bool *ret = NULL)
+class Timeout
 {
-  unsigned long timeout;
-  if (stream_mode)
-    timeout = 500;
-  else
-    timeout = 5000;
-
-  if ((millis() - start) < timeout)
-    return false;
-  if (ret) {
-    *ret = false;
-    return true;
-  }
+public:
+  Timeout() {};
+  void reset() { start = millis(); };
+  bool elapsed() { return (millis() - start) > 500; };
+  void die(void) {
+    if (! elapsed())
+      return;
 #ifdef LED_DEBUG
-  /* signal the error reset with one second flashing debug LEDs */
-  DBG(pin_LED2, high());
-  DBG(pin_LED1, low());
-  for (int i = 0; i < 10; i++) {
-    delay(100);
-    DBG(pin_LED1, toggle());
-    DBG(pin_LED2, toggle());
-  }
+    /* signal the error reset with one second flashing debug LEDs */
+    DBG(pin_LED2, high());
+    DBG(pin_LED1, low());
+    for (int i = 0; i < 10; i++) {
+      delay(100);
+      DBG(pin_LED1, toggle());
+      DBG(pin_LED2, toggle());
+    }
 #endif
-  wdt_enable(WDTO_30MS);
-  while(true) {} ;
-}
+    wdt_enable(WDTO_30MS);
+    while(true) {};
+  };
+private:
+  unsigned long start;
+};
+Timeout SendTimeout;
 
-void send_bit(unsigned long start, bool data)
+void send_bit(bool data)
 {
   pin_set(pin_DATA, data);
   /* wait for clock cycle */
   while (!pin_CLK)
-    die_if_timeout(start);
+    SendTimeout.die();
   while (pin_CLK)
-    die_if_timeout(start);
+    SendTimeout.die();
 }
 
 void mouse_write(uint8_t data)
 {
   uint8_t i;
   uint8_t parity = 1;
-  unsigned long start = millis();
+  SendTimeout.reset();
 
   detachInterrupt(clk_interrupt);
   /* put pins in output mode */
@@ -313,23 +312,23 @@ void mouse_write(uint8_t data)
   delayMicroseconds(10); /* Arduino-GPIO is too fast, so wait until CLK is actually high */
   /* wait for mouse to take control of clock); */
   while (pin_CLK)
-    die_if_timeout(start);
+    SendTimeout.die();
   /* clock is low, and we are clear to send data */
   for (i=0; i < 8; i++) {
-    send_bit(start, data & 1);
+    send_bit(data & 1);
     parity = parity ^ (data & 0x01);
     data >>= 1;
   }
   /* parity */
-  send_bit(start, parity);
+  send_bit(parity);
   /* stop bit */
   pin_high(pin_DATA);
   delayMicroseconds(50);
   while (pin_CLK)
-    die_if_timeout(start);
+    SendTimeout.die();
   /* wait for mouse to switch modes */
   while (! pin_CLK || ! pin_DATA)
-    die_if_timeout(start);
+    SendTimeout.die();
   DBG(pin_LED1, low());
   bus_idle();             /* enable incoming data, will be handled by ISR */
   delayMicroseconds(10);  /* to allow pin_CLK to settle */
