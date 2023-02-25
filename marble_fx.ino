@@ -105,6 +105,29 @@ GPIO<int2board(LED2_PIN)> pin_LED2;
  */
 //#define SAMPLE_RATE 200
 
+class JiggleTimer
+{
+public:
+  JiggleTimer() { start_time = 0; count = 0; };
+
+  void reset(void) { start_time = millis(); count = 0; };
+  bool jiggle(void) {
+    unsigned long now = millis();
+    if (now - start_time < 30000)
+      return false;
+    while (now - start_time >= 30000) {
+      count++;
+      start_time += 30000;
+    }
+    return count < 60;
+  };
+  int count;
+private:
+  unsigned long start_time;
+};
+
+JiggleTimer jiggletimer;
+
 /* will be set from switches on pins 7 and 8 */
 bool lefthanded = false;
 bool jiggler = true;
@@ -417,14 +440,10 @@ void setup()
   mouse_setup();
 }
 
-long last_move = 0;
-int jigglecount = 0;
-
 void move(int8_t x, int8_t y, int8_t z)
 {
   Mouse.move(x, y, z);
-  last_move = millis();
-  jigglecount = 0;
+  jiggletimer.reset();
 }
 
 /*
@@ -531,15 +550,11 @@ void loop()
   if (! jiggler)
     return;
 
-  long  jiggle = (millis() - last_move);
-  if (jiggle > 30000L * (jigglecount + 1) && jiggle < 1800000) {
-    jigglecount++;
+  if (jiggletimer.jiggle()) {
     if (!USBDevice.isSuspended()) {
 #ifdef SERIALDEBUG
       Serial.print("JIGGLE! ");
-      Serial.print(jiggle);
-      Serial.print(" ");
-      Serial.println(jigglecount);
+      Serial.println(jiggletimer.count);
 #endif
       Mouse.move(1,0,0);
       Mouse.move(-1,0,0);
