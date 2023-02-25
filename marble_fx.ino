@@ -52,8 +52,6 @@
 //# define SERIALDEBUG 1
 //# define LED_DEBUG
 
-#define USE_INTERRUPT
-
 #ifdef USE_LEGACY_HID
 #include "Mouse.h"
 #else
@@ -119,7 +117,6 @@ int scroll_sum = 0;
 
 bool stream_mode = false;
 
-#ifdef USE_INTERRUPT
 const uint8_t clk_interrupt = digitalPinToInterrupt(3);
 uint8_t ps2_error = 0;
 
@@ -214,7 +211,6 @@ done:
   parity = false;
   return;
 }
-#endif
 
 void bus_idle(void)
 {
@@ -266,9 +262,7 @@ void mouse_write(uint8_t data)
   uint8_t parity = 1;
   unsigned long start = millis();
 
-#ifdef USE_INTERRUPT
   detachInterrupt(clk_interrupt);
-#endif
   /* put pins in output mode */
   bus_idle();
   delayMicroseconds(300);
@@ -300,19 +294,13 @@ void mouse_write(uint8_t data)
   while (! pin_CLK || ! pin_DATA)
     die_if_timeout(start);
   DBG(pin_LED1, low());
-#ifdef USE_INTERRUPT
   bus_idle();             /* enable incoming data, will be handled by ISR */
   delayMicroseconds(10);  /* to allow pin_CLK to settle */
   attachInterrupt(clk_interrupt, ps2_ISR, FALLING);
-#else
-  /* put a hold on the incoming data. */
-  pin_low(pin_CLK);
-#endif
 }
 
-#ifdef USE_INTERRUPT
 /*
- * interrupt version of mouse_read():
+ * get a byte of data from the ring buffer:
  * wait for max ~50ms for ringbuffer to fill, then
  * fetch one byte from the ringbuffer (or return error)
  * actual read from mouse is done in the ISR
@@ -334,73 +322,6 @@ uint8_t mouse_read(bool *ret = NULL)
     *ret = true;
   return mbuf_pull();
 }
-#else
-/*
- * Get a byte of data from the mouse
- * ret is the return code (true if data was delivered, false if timeout)
- * timeout reporting is needed so that we can block in stream mode, but
- * the mouse jiggler can still do its job ;-)
- */
-uint8_t mouse_read(bool *ret = NULL)
-{
-  uint8_t data = 0x00;
-  int i;
-  uint8_t bit = 0x01;
-
-  if (ret)
-    *ret = true;
-  bus_idle();
-  delayMicroseconds(50);
-  long start = millis();
-  while (pin_CLK) {
-    if (die_if_timeout(start, ret))
-      goto out;
-  }
-  DBG(pin_LED2, high());
-  while (! pin_CLK) { /* eat start bit */
-    if (die_if_timeout(start, ret))
-      goto out;
-  }
-  for (i=0; i < 8; i++) {
-    while (pin_CLK) {
-      if (die_if_timeout(start, ret))
-        goto out;
-    }
-    if (pin_DATA) {
-      data = data | bit;
-    }
-    while (! pin_CLK) {
-      if (die_if_timeout(start, ret))
-        goto out;
-    }
-    bit <<= 1;
-  }
-  /* eat parity bit, (ignored) */
-  while (pin_CLK) {
-    if (die_if_timeout(start, ret))
-      goto out;
-  }
-  while (!pin_CLK) {
-    if (die_if_timeout(start, ret))
-      goto out;
-  }
-  /* eat stop bit */
-  while (pin_CLK) {
-    if (die_if_timeout(start, ret))
-      goto out;
-  }
-  while (!pin_CLK) {
-    if (die_if_timeout(start, ret))
-      goto out;
-  }
-
-out:
-  /* stop incoming data. */
-  pin_low(pin_CLK);
-  DBG(pin_LED2, low());
-  return data;
-}
-#endif
 
 void mouse_init()
 {
