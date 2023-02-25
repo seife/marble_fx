@@ -499,7 +499,7 @@ void loop()
   }
   uint8_t mstat = mouse_read(&ret);
 
-  if (ret || !stream_mode) { /* no timeout */
+  if (ret) { /* no timeout */
     int8_t mx    = (int8_t)mouse_read();
     int8_t my    = (int8_t)mouse_read();
 #ifdef SERIALDEBUG
