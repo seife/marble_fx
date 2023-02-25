@@ -249,6 +249,12 @@ void bus_idle(void)
   pin_high(pin_CLK);
 }
 
+void bus_stop(void)
+{
+  pin_low(pin_CLK);
+  pin_high(pin_DATA);
+}
+
 bool die_if_timeout(unsigned long start, bool *ret = NULL)
 {
   unsigned long timeout;
@@ -493,6 +499,13 @@ void loop()
   jiggler =    pin_JIGGLE;    /* default on if pin open */
   lefthanded = !pin_LEFTHAND; /* default off */
   pin_LED.toggle();
+  if (ps2_error) {
+    detachInterrupt(clk_interrupt);
+    bus_stop();
+    ps2_error = 0;
+    mbuf.reset();
+    mouse_setup();
+  }
   if (!stream_mode) {
     mouse_write(0xeb);  /* give me data! */
     mouse_read();      /* ignore ack */
