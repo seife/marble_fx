@@ -143,44 +143,52 @@ bool stream_mode = false;
 const uint8_t clk_interrupt = digitalPinToInterrupt(3);
 uint8_t ps2_error = 0;
 
-/* ring buffer for received bytes */
-#define MBUF_SIZE 16
-uint8_t mbuf[MBUF_SIZE];
-uint8_t mbuf_h = 0;
-uint8_t mbuf_t = 0;
-void mbuf_push(uint8_t data)
+class Mousebuffer
 {
-  uint8_t sreg = SREG;
-  cli();
-  uint8_t next = (mbuf_h + 1) % MBUF_SIZE;
-  if (next != mbuf_t) {
-    mbuf[mbuf_h] = data;
-    mbuf_h = next;
-  }
-  SREG = sreg;
-}
-
-uint8_t mbuf_pull(void)
-{
-  uint8_t ret = 0;
-  uint8_t sreg = SREG;
-  cli();
-  if (mbuf_h != mbuf_t) {
-    ret = mbuf[mbuf_t];
-    mbuf_t = (mbuf_t + 1) % MBUF_SIZE;
-  }
-  SREG = sreg;
-  return ret;
-}
-
-bool mbuf_empty(void)
-{
-  uint8_t sreg = SREG;
-  cli();
-  bool ret = (mbuf_h == mbuf_t);
-  SREG = sreg;
-  return ret;
-}
+  /* ring buffer for received bytes */
+  #define MBUF_SIZE 16
+private:
+  uint8_t buf[MBUF_SIZE];
+  uint8_t head;
+  uint8_t tail;
+public:
+  Mousebuffer(void) { head = tail = 0; };
+  void push(uint8_t data) {
+    uint8_t sreg = SREG;
+    cli();
+    uint8_t next = (head + 1) % MBUF_SIZE;
+    if (next != tail) {
+      buf[head] = data;
+      head = next;
+    }
+    SREG = sreg;
+  };
+  uint8_t pull(void) {
+    uint8_t ret = 0;
+    uint8_t sreg = SREG;
+    cli();
+    if (head != tail) {
+      ret = buf[tail];
+      tail = (++tail) % MBUF_SIZE;
+    }
+    SREG = sreg;
+    return ret;
+  };
+  bool empty(void) {
+    uint8_t sreg = SREG;
+    cli();
+    bool ret = (head == tail);
+    SREG = sreg;
+    return ret;
+  };
+  void reset(void) {
+    uint8_t sreg = SREG;
+    cli();
+    head = tail = 0;
+    SREG = sreg;
+  };
+};
+Mousebuffer mbuf;
 
 enum {
   NONE, START,
@@ -217,7 +225,7 @@ void ps2_ISR(void)
     case STOP:
       if (!pin_DATA)
         goto error;
-      mbuf_push(data);
+      mbuf.push(data);
       DBG(pin_LED1, low());
       goto done;
       break;
@@ -332,10 +340,10 @@ void mouse_write(uint8_t data)
 uint8_t mouse_read(bool *ret = NULL)
 {
   uint8_t retry = 50;
-  while (retry-- && mbuf_empty())
+  while (retry-- && mbuf.empty())
     delay(1);
   DBG(pin_LED2, high());
-  if (mbuf_empty()) {
+  if (mbuf.empty()) {
     if (ret)
       *ret = false;
     DBG(pin_LED2, low());
@@ -343,7 +351,7 @@ uint8_t mouse_read(bool *ret = NULL)
   }
   if (ret)
     *ret = true;
-  return mbuf_pull();
+  return mbuf.pull();
 }
 
 void mouse_init()
