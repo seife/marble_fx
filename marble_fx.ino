@@ -89,6 +89,12 @@ GPIO<int2board(LED2_PIN)> pin_LED2;
 #define DBG(PIN, FUNC) do {} while (0)
 #endif
 
+#ifdef SERIALDEBUG
+#define DSERIAL(WHAT) Serial.WHAT
+#else
+#define DSERIAL(WHAT)
+#endif
+
 #define pin_high(PIN) do { PIN.input().pullup(); } while (0)
 #define pin_low(PIN)  do { PIN.output(); PIN.low(); } while (0)
 #define pin_set(PIN, STATE) do { if (STATE) pin_high(PIN); else pin_low(PIN); } while (0)
@@ -418,10 +424,8 @@ bool ps2pp_decode(uint8_t b0, uint8_t b1, uint8_t b2)
   // mouse extra info
   if ((b0 & 0x30) == 0x0 && (b1 & 0xf0) == 0xd0) {
     xtrabutton = (b2 & 0x30);
-#ifdef SERIALDEBUG
-    Serial.print("xtrabutton: ");
-    Serial.println((int)xtrabutton, HEX);
-#endif
+    DSERIAL(print("xtrabutton: "));
+    DSERIAL(println((int)xtrabutton, HEX));
   }
   return true;
 }
@@ -516,13 +520,11 @@ void loop()
   if (ret) { /* no timeout */
     int8_t mx    = (int8_t)mouse_read();
     int8_t my    = (int8_t)mouse_read();
-#ifdef SERIALDEBUG
-    Serial.print((int)mstat, HEX);
-    Serial.print("\t");
-    Serial.print((int)mx);
-    Serial.print("\t");
-    Serial.println((int)my);
-#endif
+    DSERIAL(print((int)mstat, HEX));
+    DSERIAL(print("\t"));
+    DSERIAL(print((int)mx));
+    DSERIAL(print("\t"));
+    DSERIAL(println((int)my));
     if (ps2pp_decode(mstat, mx, my) || USBDevice.isSuspended())
       return; // do nothing.
 
@@ -536,22 +538,18 @@ void loop()
       }
       if (scroll != 0) {
         scroll_sum = 0;
-#ifdef SERIALDEBUG
-        Serial.print("SCRL ");
-        Serial.println((int)scroll);
-#endif
+        DSERIAL(print("SCRL "));
+        DSERIAL(println((int)scroll));
         move(0, 0, scroll);
       }
     } else {
       /* -my to get the direction right... */
       if (mx != 0 || my != 0) {
         move(mx, -my, 0);
-#ifdef SERIALDEBUG
-        Serial.print("MOVE ");
-        Serial.print((int)mx);
-        Serial.print(" ");
-        Serial.println((int)my);
-#endif
+        DSERIAL(print("MOVE "));
+        DSERIAL(print((int)mx));
+        DSERIAL(print(" "));
+        DSERIAL(println((int)my));
       }
       scroll_sum = 0;
     }
@@ -572,10 +570,8 @@ void loop()
 
   if (jiggletimer.jiggle()) {
     if (!USBDevice.isSuspended()) {
-#ifdef SERIALDEBUG
-      Serial.print("JIGGLE! ");
-      Serial.println(jiggletimer.count);
-#endif
+      DSERIAL(print("JIGGLE! "));
+      DSERIAL(println(jiggletimer.count));
       Mouse.move(1,0,0);
       Mouse.move(-1,0,0);
     }
