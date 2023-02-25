@@ -108,10 +108,12 @@ GPIO<int2board(LED2_PIN)> pin_LED2;
 class JiggleTimer
 {
 public:
-  JiggleTimer() { start_time = 0; count = 0; };
+  JiggleTimer() { start_time = 0; count = 0; enabled = true; };
 
   void reset(void) { start_time = millis(); count = 0; };
   bool jiggle(void) {
+    if (! enabled || count > 60)
+      return false;
     unsigned long now = millis();
     if (now - start_time < 30000)
       return false;
@@ -122,6 +124,7 @@ public:
     return count < 60;
   };
   int count;
+  bool enabled;
 private:
   unsigned long start_time;
 };
@@ -130,7 +133,6 @@ JiggleTimer jiggletimer;
 
 /* will be set from switches on pins 7 and 8 */
 bool lefthanded = false;
-bool jiggler = true;
 /* global variables */
 uint8_t xtrabutton = 0;
 bool buttons[3] = { false, false, false };
@@ -432,7 +434,7 @@ void setup()
   pin_low(pin_CLK);
   pin_JIGGLE.input().pullup();
   pin_LEFTHAND.input().pullup();
-  jiggler =    pin_JIGGLE;    /* default on if pin open */
+  jiggletimer.enabled = pin_JIGGLE; /* default on if pin open */
   lefthanded = !pin_LEFTHAND; /* default off */
 #ifdef SERIALDEBUG
   Serial.begin(115200); /* baudrate does not matter */
@@ -440,7 +442,7 @@ void setup()
   while(! Serial) {};
   Serial.println("HELLO!");
   Serial.print("Jiggler:\t");
-  Serial.println(jiggler);
+  Serial.println(jiggletimer.enabled);
   Serial.print("Lefthanded:\t");
   Serial.println(lefthanded);
 #endif
@@ -495,7 +497,7 @@ void loop()
   bool ret;
   /* update the switch state.
      Does this even make sense at run time? but it does not hurt anyway ;-) */
-  jiggler =    pin_JIGGLE;    /* default on if pin open */
+  jiggletimer.enabled = pin_JIGGLE; /* default on if pin open */
   lefthanded = !pin_LEFTHAND; /* default off */
   pin_LED.toggle();
   if (ps2_error) {
@@ -567,8 +569,6 @@ void loop()
     if (!stream_mode)
       delay(20);
   }
-  if (! jiggler)
-    return;
 
   if (jiggletimer.jiggle()) {
     if (!USBDevice.isSuspended()) {
