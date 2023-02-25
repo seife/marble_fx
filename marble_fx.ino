@@ -168,8 +168,8 @@ public:
     uint8_t sreg = SREG;
     cli();
     if (head != tail) {
-      ret = buf[tail];
-      tail = (++tail) % MBUF_SIZE;
+      ret = buf[tail++];
+      tail %= MBUF_SIZE;
     }
     SREG = sreg;
     return ret;
