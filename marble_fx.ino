@@ -415,10 +415,35 @@ void mouse_setup(void)
   ps2pp_write_magic_ping();
   if (stream_mode)
     mouse_enable_report();
+  /* mouse will return a ps2++ P0 packet, which loop() will handle */
 }
 
 bool ps2pp_decode(uint8_t b0, uint8_t b1, uint8_t b2)
 {
+#ifdef SERIALDEBUG
+  if ((b0 & 0x48) == 0x48) {
+    uint8_t ptype = ((b0 & 0x30) >> 2) | ((b1 & 0x30) >> 4);
+    Serial.print("ps2++ packet type P");
+    Serial.print(ptype, HEX);
+    switch (ptype) {
+      case 0xb:
+        {
+          if (b2 & 0x80)
+            Serial.print(" BTN: 0x");
+          else
+            Serial.print(" SHP: 0x");
+          Serial.print(b2 & 0x7f, HEX);
+        }
+    }
+    Serial.print(" (raw: 0x");
+    Serial.print(b0, HEX);
+    Serial.print(" 0x");
+    Serial.print(b1, HEX);
+    Serial.print(" 0x");
+    Serial.print(b2, HEX);
+    Serial.println(")");
+  }
+#endif
   /* values from linux/drivers/input/mouse/logips2pp.c */
   if ((b0 & 0x48) != 0x48 || (b1 & 0x02) != 0x02)
     return false;
