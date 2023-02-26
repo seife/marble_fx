@@ -99,7 +99,19 @@ GPIO<int2board(LED2_PIN)> pin_LED2;
 #define pin_low(PIN)  do { PIN.output(); PIN.low(); } while (0)
 #define pin_set(PIN, STATE) do { if (STATE) pin_high(PIN); else pin_low(PIN); } while (0)
 
-/* and non-standard SAMPLE_RATE setting is disabled by default.
+/* defines for magic protocol bytes
+ * https://web.archive.org/web/20051201201655/http://www.computer-engineering.org/ps2mouse/ */
+#define PS2_RESET      0xFF
+#define PS2_REPORT_DIS 0xF5
+#define PS2_REPORT_ENA 0xF4
+#define PS2_SET_SRATE  0xF3
+#define PS2_SET_REMOTE 0xF0
+#define PS2_READ_DATA  0xEB
+#define PS2_SET_STREAM 0xEA
+#define PS2_STATUS     0xE9
+#define PS2_SET_RESO   0xE8
+
+/* non-standard SAMPLE_RATE setting is disabled by default.
  * while it sounds useful at first glance, it results in problems when
  * (really) fast moving the ball, and it does not give considerable
  * benefits in standard usage etiher
@@ -372,20 +384,20 @@ void mouse_init()
   bus_idle();
   delay(250);    /* allow mouse to power on */
   /* reset */
-  mouse_write(0xff);
+  mouse_write(PS2_RESET);
   mouse_read();  /* ack */
   delay(400);    /* the reset takes almost 400ms */
   mouse_read();  /* 0xAA */
   mouse_read();  /* Device ID 0x00 */
-  pin_LED.toggle();  /* led off to see we passsed first init */
+  pin_LED.toggle(); /* led off to see we passsed first init */
 #ifdef SAMPLE_RATE
-  mouse_write(0xf3);  /* sample rate */
+  mouse_write(PS2_SET_SRATE);
   mouse_read();  /* ack */
   mouse_write(SAMPLE_RATE);
   mouse_read();  /* ack */
 #endif
   if (!stream_mode) {
-    mouse_write(0xf0);  /* remote mode */
+    mouse_write(PS2_SET_REMOTE);
     mouse_read();  /* ack */
     delayMicroseconds(100);
   }
@@ -393,7 +405,7 @@ void mouse_init()
 
 void mouse_enable_report()
 {
-  mouse_write(0xf4); /* enable report */
+  mouse_write(PS2_REPORT_ENA);
   mouse_read(); /* ack */
   delayMicroseconds(100);
 }
@@ -542,7 +554,7 @@ void loop()
     mouse_setup();
   }
   if (!stream_mode) {
-    mouse_write(0xeb);  /* give me data! */
+    mouse_write(PS2_READ_DATA);
     mouse_read();      /* ignore ack */
   }
   bool ret = mouse_ready();
