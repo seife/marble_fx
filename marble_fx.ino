@@ -558,6 +558,12 @@ void loop()
     if (ps2pp_decode(mstat, mx, my) || USBDevice.isSuspended())
       return; // do nothing.
 
+    if (mstat & 0xC0) { /* the overflow bits are never set on ps2pp */
+      ps2_error = mstat;
+      DSERIAL(println("OVERFLOW"));
+      return; /* will reenter loop() and reset from there */
+    }
+
     uint8_t btn = map_buttons(mstat, xtrabutton);
     bool redbutton = btn & 0x10;
     if (redbutton) { /* translate y scroll into wheel-scroll */
