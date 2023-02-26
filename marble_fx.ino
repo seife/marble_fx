@@ -123,13 +123,13 @@ GPIO<int2board(LED2_PIN)> pin_LED2;
  */
 //#define SAMPLE_RATE 200
 
-class JiggleTimer
+class MyTimer
 {
 public:
-  JiggleTimer() { start_time = 0; count = 0; enabled = true; };
+  MyTimer() { start_time = 0; count = 0; enabled = true; };
 
   void reset(void) { start_time = millis(); count = 0; };
-  bool jiggle(void) {
+  bool action(void) {
     if (! enabled || count > 60)
       return false;
     unsigned long now = millis();
@@ -147,7 +147,8 @@ private:
   unsigned long start_time;
 };
 
-JiggleTimer jiggletimer;
+MyTimer jiggletimer;
+MyTimer heartbeat;
 
 /* will be set from switches on pins 7 and 8 */
 bool lefthanded = false;
@@ -546,12 +547,23 @@ void loop()
     mouse_write(PS2_READ_DATA);
     mouse_read();      /* ignore ack */
   }
+  else if (heartbeat.action()) {
+    DSERIAL(print("HEARTBEAT:"));
+    heartbeat.reset();
+    mouse_write(PS2_STATUS); /* status request */
+    for (uint8_t i = 0; i < 4; i++) { /* ack + 3 byte response */
+      DSERIAL(print(" 0x"));
+      uint8_t d = mouse_read();
+      DSERIAL(print(d, HEX));
+    }
+    DSERIAL(println());
+  }
   bool ret = mouse_ready();
   if (ret) { /* no timeout */
     uint8_t mstat = mbuf.pull();
     int8_t mx    = (int8_t)mouse_read();
     int8_t my    = (int8_t)mouse_read();
-    DSERIAL(print((int)mstat, HEX));
+    DSERIAL(print(mstat, HEX));
     DSERIAL(print("\t"));
     DSERIAL(print((int)mx));
     DSERIAL(print("\t"));
@@ -605,7 +617,7 @@ void loop()
       delay(20);
   }
 
-  if (jiggletimer.jiggle()) {
+  if (jiggletimer.action()) {
     if (!USBDevice.isSuspended()) {
       DSERIAL(print("JIGGLE! "));
       DSERIAL(println(jiggletimer.count));
