@@ -159,7 +159,7 @@ bool buttons[3] = { false, false, false };
 uint8_t bmask[3] = { 0x01, 0x02, 0x04 };
 int8_t scroll_sum = 0;
 
-bool stream_mode = false;
+bool stream_mode = true;
 
 const uint8_t clk_interrupt = digitalPinToInterrupt(3);
 uint8_t ps2_error = 0;
