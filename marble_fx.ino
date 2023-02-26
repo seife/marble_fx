@@ -281,36 +281,23 @@ public:
   Timeout() {};
   void reset() { start = millis(); };
   bool elapsed() { return (millis() - start) > 500; };
-  void die(void) {
-    if (! elapsed())
-      return;
-#ifdef LED_DEBUG
-    /* signal the error reset with one second flashing debug LEDs */
-    DBG(pin_LED2, high());
-    DBG(pin_LED1, low());
-    for (uint8_t i = 0; i < 10; i++) {
-      delay(100);
-      DBG(pin_LED1, toggle());
-      DBG(pin_LED2, toggle());
-    }
-#endif
-    wdt_enable(WDTO_30MS);
-    while(true) {};
-  };
 private:
   unsigned long start;
 };
 Timeout SendTimeout;
 
-void send_bit(bool data)
-{
-  pin_set(pin_DATA, data);
-  /* wait for clock cycle */
-  while (!pin_CLK)
-    SendTimeout.die();
-  while (pin_CLK)
-    SendTimeout.die();
-}
+#define loop_while(COND) \
+  while (COND) { \
+    if (SendTimeout.elapsed()) \
+      goto error; \
+  }
+
+#define send_bit(LEVEL) \
+  do { \
+    pin_set(pin_DATA, LEVEL); \
+    loop_while(!pin_CLK); \
+    loop_while(pin_CLK); \
+  } while (0)
 
 void mouse_write(uint8_t data)
 {
@@ -331,8 +318,7 @@ void mouse_write(uint8_t data)
   pin_high(pin_CLK);
   delayMicroseconds(10); /* Arduino-GPIO is too fast, so wait until CLK is actually high */
   /* wait for mouse to take control of clock); */
-  while (pin_CLK)
-    SendTimeout.die();
+  loop_while(pin_CLK);
   /* clock is low, and we are clear to send data */
   for (i=0; i < 8; i++) {
     send_bit(data & 1);
@@ -344,15 +330,18 @@ void mouse_write(uint8_t data)
   /* stop bit */
   pin_high(pin_DATA);
   delayMicroseconds(50);
-  while (pin_CLK)
-    SendTimeout.die();
+  loop_while(pin_CLK);
   /* wait for mouse to switch modes */
-  while (! pin_CLK || ! pin_DATA)
-    SendTimeout.die();
+  loop_while(! pin_CLK || ! pin_DATA);
   DBG(pin_LED1, low());
   bus_idle();             /* enable incoming data, will be handled by ISR */
   delayMicroseconds(10);  /* to allow pin_CLK to settle */
   attachInterrupt(clk_interrupt, ps2_ISR, FALLING);
+  return;
+error:
+  /* error recovery code in loop() will try to restart ps2 mouse */
+  bus_stop();
+  ps2_error = 0x10;
 }
 
 /*
