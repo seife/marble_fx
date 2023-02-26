@@ -344,27 +344,27 @@ void mouse_write(uint8_t data)
 }
 
 /*
- * get a byte of data from the ring buffer:
- * wait for max ~50ms for ringbuffer to fill, then
- * fetch one byte from the ringbuffer (or return error)
- * actual read from mouse is done in the ISR
- * if *ret != NULL it will contain the return state (false = timeout)
+ * check ringbuffer state
+ * wait for max ~200ms for byte to arrive, then return
+ * normally, this should not take longer than 20ms, but the logitechs seem
+ * to take longer... And it should not hurt as it is only a worst-case value.
  */
-uint8_t mouse_read(bool *ret = NULL)
+bool mouse_ready(void)
 {
-  uint8_t retry = 50;
+  uint8_t retry = 200;
   while (retry-- && mbuf.empty())
     delay(1);
-  DBG(pin_LED2, high());
-  if (mbuf.empty()) {
-    if (ret)
-      *ret = false;
-    DBG(pin_LED2, low());
-    return 0;
-  }
-  if (ret)
-    *ret = true;
-  return mbuf.pull();
+  bool ret = !mbuf.empty();
+  DBG(pin_LED2, write(ret));
+  return ret;
+}
+
+/* convenience function: fetch a byte with wait */
+uint8_t mouse_read()
+{
+  if (mouse_ready())
+    return mbuf.pull();
+  return 0;
 }
 
 void mouse_init()
@@ -373,9 +373,10 @@ void mouse_init()
   delay(250);    /* allow mouse to power on */
   /* reset */
   mouse_write(0xff);
-  mouse_read();  /* ack byte */
-  mouse_read();  /* blank */
-  mouse_read();  /* blank */
+  mouse_read();  /* ack */
+  delay(400);    /* the reset takes almost 400ms */
+  mouse_read();  /* 0xAA */
+  mouse_read();  /* Device ID 0x00 */
   pin_LED.toggle();  /* led off to see we passsed first init */
 #ifdef SAMPLE_RATE
   mouse_write(0xf3);  /* sample rate */
@@ -498,7 +499,6 @@ uint8_t map_buttons(uint8_t mstat, uint8_t xtra)
 
 void loop()
 {
-  bool ret;
   /* update the switch state.
      Does this even make sense at run time? but it does not hurt anyway ;-) */
   jiggletimer.enabled = pin_JIGGLE; /* default on if pin open */
@@ -515,9 +515,9 @@ void loop()
     mouse_write(0xeb);  /* give me data! */
     mouse_read();      /* ignore ack */
   }
-  uint8_t mstat = mouse_read(&ret);
-
+  bool ret = mouse_ready();
   if (ret) { /* no timeout */
+    uint8_t mstat = mbuf.pull();
     int8_t mx    = (int8_t)mouse_read();
     int8_t my    = (int8_t)mouse_read();
     DSERIAL(print((int)mstat, HEX));
