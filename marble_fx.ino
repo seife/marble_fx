@@ -524,12 +524,17 @@ uint8_t map_buttons(uint8_t mstat, uint8_t xtra)
 
 void loop()
 {
+#ifdef SERIALDEBUG
+  if (Serial.available())
+    Serial.read(); /* avoid host side blocking if something is typed in terminal */
+#endif
   /* update the switch state.
      Does this even make sense at run time? but it does not hurt anyway ;-) */
   jiggletimer.enabled = pin_JIGGLE; /* default on if pin open */
   lefthanded = !pin_LEFTHAND; /* default off */
   pin_LED.toggle();
   if (ps2_error) {
+    DSERIAL(println("PS2_ERROR => Reset"));
     detachInterrupt(clk_interrupt);
     bus_stop();
     ps2_error = 0;
