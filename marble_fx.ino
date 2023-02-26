@@ -144,7 +144,7 @@ uint8_t xtrabutton = 0;
 bool buttons[3] = { false, false, false };
 // lucky us, the definitions of MOUSE_LEFT,_RIGHT,_MIDDLE are also 1,2,4...
 uint8_t bmask[3] = { 0x01, 0x02, 0x04 };
-int scroll_sum = 0;
+int8_t scroll_sum = 0;
 
 bool stream_mode = false;
 
@@ -276,7 +276,7 @@ public:
     /* signal the error reset with one second flashing debug LEDs */
     DBG(pin_LED2, high());
     DBG(pin_LED1, low());
-    for (int i = 0; i < 10; i++) {
+    for (uint8_t i = 0; i < 10; i++) {
       delay(100);
       DBG(pin_LED1, toggle());
       DBG(pin_LED2, toggle());
