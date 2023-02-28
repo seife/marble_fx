@@ -30,6 +30,14 @@ if [ "$1" == "custom" ]; then
 	props+=( --build-property build.vid=0x1209 )
 fi
 
+if [ "$1" == "fritz" ]; then
+	shift
+	props+=( --build-property build.usb_manufacturer='"Fritz"' )
+	props+=( --build-property build.usb_product='"TrackMan Marble"' )
+	props+=( --build-property build.vid=0x1209 )
+fi
+
+
 arduino-cli compile \
 	-b "$BOARD" \
 	"${props[@]}" \
