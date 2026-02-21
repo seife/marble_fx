@@ -127,23 +127,25 @@ GPIO<int2board(LED2_PIN)> pin_LED2;
  */
 //#define SAMPLE_RATE 200
 
+#define JIGTIMEOUT 30000
 class MyTimer
 {
 public:
   MyTimer() { start_time = 0; count = 0; enabled = true; };
 
   void reset(void) { start_time = millis(); count = 0; };
+  bool expired(void) { return count > 60; };
   bool action(void) {
-    if (! enabled || count > 60)
+    if (! enabled || expired())
       return false;
     unsigned long now = millis();
-    if (now - start_time < 30000)
+    if (now - start_time < JIGTIMEOUT)
       return false;
-    while (now - start_time >= 30000) {
+    while (now - start_time >= JIGTIMEOUT) {
       count++;
-      start_time += 30000;
+      start_time += JIGTIMEOUT;
     }
-    return count < 60;
+    return ! expired();
   };
   int count;
   bool enabled;
