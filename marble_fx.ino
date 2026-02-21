@@ -524,7 +524,10 @@ void setup()
 #ifdef SERIALDEBUG
   Serial.begin(115200); /* baudrate does not matter */
   delay(100);
-  while(! Serial) {};
+  while(! Serial) {
+    if (millis() > 10000)
+      break; /* continue anyway... */
+  }
   Serial.println("HELLO!");
   Serial.print("Jiggler:\t");
   Serial.println(jiggletimer.enabled);
@@ -611,6 +614,7 @@ void loop()
       DSERIAL(print(" 0x"));
       uint8_t d = mouse_read();
       DSERIAL(print(d, HEX));
+      (void)d;
     }
     DSERIAL(println());
   }
