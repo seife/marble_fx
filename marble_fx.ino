@@ -544,9 +544,63 @@ void setup()
   mouse_setup();
 }
 
+#ifdef NO_SCALE
+int8_t scale(int8_t v)
+{
+  return v;
+}
+#else
+int8_t scale(int8_t v)
+{
+  /* with sample_rate=200 max values for x and y are ~20
+   * with sample_rate=100, it's about double that => ~40
+   * above is true with T-CJ12,
+   * with T-BC21 it sems that ~25 is max at rate = 200
+   * a T-CM14 (2 buttons only) gives ~20 like T-CJ12 */
+  int a = abs(v);
+  int8_t ret;
+  if (a > 128/3) {  /* just don't overflow */
+    if (v > 0)
+      return 127;
+    return -127;
+  }
+  switch(a) {
+#if SAMPLE_RATE == 200
+    case 10 ... 128:/* 10 => 30 */
+      return v * 3;
+    case 9:   ret = 25; break;
+    case 8:   ret = 19; break;
+    case 7:   ret = 14; break;
+    case 6:   ret = 10; break;
+    case 5:   ret = 7;  break;
+    case 4:   ret = 5;  break;
+#else
+    case 20 ... 128:
+      return v * 3;
+    case 19:  ret = 55; break;
+    case 18:  ret = 50; break;
+    case 17:  ret = 44; break;
+    case 16:  ret = 38; break;
+    case 15:  ret = 33; break;
+    case 14:  ret = 28; break;
+    case 13:  ret = 24; break;
+    case 12:  ret = 20; break;
+    case 11:  ret = 17; break;
+    case 10:  ret = 14; break;
+    case  9:  ret = 12; break;
+    case  8:  ret = 10; break;
+#endif
+    default:  return v;
+  }
+  if (v < 0)
+    return -ret;
+  return ret;
+}
+#endif
+
 void move(int8_t x, int8_t y, int8_t z)
 {
-  Mouse.move(x, y, z);
+  Mouse.move(scale(x), scale(y), z);
   jiggletimer.reset();
 }
 
@@ -659,7 +713,17 @@ void loop()
         DSERIAL(print("MOVE "));
         DSERIAL(print((int)mx));
         DSERIAL(print(" "));
-        DSERIAL(println((int)my));
+        DSERIAL(print((int)my));
+        static int max_x, max_y;
+        if (abs(mx) > max_x)
+          max_x = abs(mx);
+        if (abs(my) > max_y)
+          max_y = abs(my);
+        DSERIAL(print(" "));
+        DSERIAL(print((int)max_x));
+        DSERIAL(print(" "));
+        DSERIAL(print((int)max_y));
+        DSERIAL(println());
       }
       scroll_sum = 0;
     }
