@@ -2,7 +2,7 @@
  * Logitech TrackMan Marble FX wheel driver
  * also supports Logitech TrackMan Marble model T-BC21 (in ps/2 mode)
  *
- * Copyright © 2018-2021 Stefan Seyfried <seife@tuxbox-git.slipkontur.de>
+ * Copyright © 2018-2026 Stefan Seyfried <seife@tuxbox-git.slipkontur.de>
  *
  * This program is free software. It comes without any warranty, to
  * the extent permitted by applicable law. You can redistribute it
@@ -53,8 +53,11 @@
 
 //# define SERIALDEBUG 1
 //# define LED_DEBUG
+#define MY_HIDMOUSE 1
 
-#ifdef USE_LEGACY_HID
+#ifdef MY_HIDMOUSE
+#include "HIDMouse.h"
+#elif defined(USE_LEGACY_HID)
 #include "Mouse.h"
 #else
 #include "HID-Project.h"
@@ -182,6 +185,10 @@ public:
     } else {
       if (diff < 1900)
         return;
+#ifdef MY_HIDMOUSE
+      DSERIAL(println("GET/SET " + String(Mouse.getReportCalled) + "/" +
+                      String(Mouse.setReportCalled)+" # "+String(Mouse.setReportVal)));
+#endif
       last_time += 1900;
       pin_LED.high();
       on = true;
@@ -542,6 +549,10 @@ void setup()
   DBG(pin_LED1, low());
   DBG(pin_LED2, low());
   mouse_setup();
+#ifdef MY_HIDMOUSE
+  DSERIAL(println("GET/SET " + String(Mouse.getReportCalled) + "/" +
+                  String(Mouse.setReportCalled)+" # "+String(Mouse.setReportVal)));
+#endif
 }
 
 #ifdef NO_SCALE
@@ -598,9 +609,14 @@ int8_t scale(int8_t v)
 }
 #endif
 
-void move(int8_t x, int8_t y, int8_t z)
+void move(int8_t x, int8_t y, int8_t v, int8_t h = 0)
 {
-  Mouse.move(scale(x), scale(y), z);
+#ifdef MY_HIDMOUSE
+  Mouse.move(scale(x), scale(y), v, h);
+#else
+  Mouse.move(scale(x), scale(y), v);
+  (void)h;
+#endif
   jiggletimer.reset();
 }
 
@@ -695,16 +711,25 @@ void loop()
     uint8_t btn = map_buttons(mstat, xtrabutton);
     bool redbutton = btn & bimask[3];
     if (internal_scrolling && redbutton) { /* translate y scroll into wheel-scroll */
+#ifdef MY_HIDMOUSE
+      int8_t scroll = my;
+      int8_t hscroll = mx;
+#else
       int8_t scroll = my / 8;
+      int8_t hscroll = 0;
       if (! scroll) {
         scroll_sum += my;
         scroll = scroll_sum / 8;
+        if (scroll != 0)
+          scroll_sum = 0;
       }
-      if (scroll != 0) {
-        scroll_sum = 0;
+#endif
+      if (hscroll != 0 || scroll != 0) {
         DSERIAL(print("SCRL "));
-        DSERIAL(println((int)scroll));
-        move(0, 0, scroll);
+        DSERIAL(print((int)scroll));
+        DSERIAL(print(" "));
+        DSERIAL(println((int)hscroll));
+        move(0, 0, scroll, hscroll);
       }
     } else {
       /* -my to get the direction right... */
