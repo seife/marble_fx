@@ -156,6 +156,47 @@ private:
 MyTimer jiggletimer;
 MyTimer heartbeat;
 
+class JigglerLed
+{
+public:
+  JigglerLed() { last_time = millis(); on = false; };
+
+  void action(bool enabled) {
+    if (! enabled) {
+      DSERIAL(println("JigglerLed: not enabled"));
+      if (!on)
+        pin_LED.high();
+      on = true;
+      return;
+    }
+    unsigned long now = millis();
+    unsigned long diff = now - last_time;
+    if (on) {
+      if (diff < 100)
+        return;
+      last_time += 100;
+      pin_LED.low();
+      on = false;
+      DSERIAL(print("JigglerLed: short tick "));
+    } else {
+      if (diff < 1900)
+        return;
+      last_time += 1900;
+      pin_LED.high();
+      on = true;
+      DSERIAL(print("JigglerLed: long  tick "));
+    }
+    DSERIAL(print(now));
+    DSERIAL(print(" "));
+    DSERIAL(println(diff));
+  };
+private:
+  bool on;
+  unsigned long last_time;
+};
+
+JigglerLed JLed;
+
 /* will be set from switches on pins 7 and 8 */
 bool lefthanded = false;
 /* global variables */
@@ -390,7 +431,6 @@ void mouse_init()
   delay(400);    /* the reset takes almost 400ms */
   mouse_read();  /* 0xAA */
   mouse_read();  /* Device ID 0x00 */
-  pin_LED.toggle(); /* led off to see we passsed first init */
 #ifdef SAMPLE_RATE
   mouse_write(PS2_SET_SRATE);
   mouse_read();  /* ack */
@@ -550,7 +590,7 @@ void loop()
   internal_scrolling = pin_SCROLL;
   jiggletimer.enabled = pin_JIGGLE; /* default on if pin open */
   lefthanded = !pin_LEFTHAND; /* default off */
-  pin_LED.toggle();
+  JLed.action(jiggletimer.enabled && !jiggletimer.expired());
   if (ps2_error) {
     DSERIAL(println("PS2_ERROR => Reset"));
     detachInterrupt(clk_interrupt);
