@@ -134,6 +134,7 @@ public:
   MyTimer() { start_time = 0; count = 0; enabled = true; };
 
   void reset(void) { start_time = millis(); count = 0; };
+  void expire(void) { count = 66; };
   bool expired(void) { return count > 60; };
   bool action(void) {
     if (! enabled || expired())
@@ -665,9 +666,13 @@ void loop()
 
     /* handle normal buttons */
     for (uint8_t i = 0; i < sizeof(buttons); i++) {
-      if(internal_scrolling && i==3)
+      if (internal_scrolling && i == 3)
         continue;
       bool button = btn & bimask[i];
+      if (redbutton && i == 2 && button && buttons[i] != button) {
+        jiggletimer.expire();
+        continue;
+      }
       if (!buttons[i] && button)
         Mouse.press(bomask[i]);
       else if (buttons[i] && !button)
