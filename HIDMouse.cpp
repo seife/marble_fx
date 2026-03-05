@@ -222,7 +222,7 @@ HIDMouse_::HIDMouse_(void) : PluggableUSBModule(1, 1, epType),
                    rootNode(NULL), descriptorSize(0),
                    protocol(HID_REPORT_PROTOCOL), idle(1)
 {
-	setReportVal = -1;
+	setReportVal = 0;
 	setReportCalled = 0;
 	getReportCalled = 0;
 	epType[0] = EP_TYPE_INTERRUPT_IN;
