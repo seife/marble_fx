@@ -729,6 +729,10 @@ void loop()
         DSERIAL(print((int)scroll));
         DSERIAL(print(" "));
         DSERIAL(println((int)hscroll));
+        if (abs(hscroll) > abs(scroll))
+          scroll = 0;
+        else
+          hscroll = 0;
         move(0, 0, scroll, hscroll);
       }
     } else {
