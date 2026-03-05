@@ -97,7 +97,8 @@ GPIO<int2board(LED2_PIN)> pin_LED2;
 #endif
 
 #ifdef SERIALDEBUG
-#define DSERIAL(WHAT) Serial.WHAT
+/* "if (Serial) { ... }" does not work as this includes a "delay(10)" call m( */
+#define DSERIAL(WHAT) do {if (Serial.availableForWrite()){ Serial.WHAT; }} while(0)
 #else
 #define DSERIAL(WHAT)
 #endif
@@ -484,25 +485,25 @@ bool ps2pp_decode(uint8_t b0, uint8_t b1, uint8_t b2)
 #ifdef SERIALDEBUG
   if ((b0 & 0x48) == 0x48) {
     uint8_t ptype = ((b0 & 0x30) >> 2) | ((b1 & 0x30) >> 4);
-    Serial.print("ps2++ packet type P");
-    Serial.print(ptype, HEX);
+    DSERIAL(print("ps2++ packet type P"));
+    DSERIAL(print(ptype, HEX));
     switch (ptype) {
       case 0xb:
         {
           if (b2 & 0x80)
-            Serial.print(" BTN: 0x");
+            DSERIAL(print(" BTN: 0x"));
           else
-            Serial.print(" SHP: 0x");
-          Serial.print(b2 & 0x7f, HEX);
+            DSERIAL(print(" SHP: 0x"));
+          DSERIAL(print(b2 & 0x7f, HEX));
         }
     }
-    Serial.print(" (raw: 0x");
-    Serial.print(b0, HEX);
-    Serial.print(" 0x");
-    Serial.print(b1, HEX);
-    Serial.print(" 0x");
-    Serial.print(b2, HEX);
-    Serial.println(")");
+    DSERIAL(print(" (raw: 0x"));
+    DSERIAL(print(b0, HEX));
+    DSERIAL(print(" 0x"));
+    DSERIAL(print(b1, HEX));
+    DSERIAL(print(" 0x"));
+    DSERIAL(print(b2, HEX));
+    DSERIAL(println(")"));
   }
 #endif
   /* values from linux/drivers/input/mouse/logips2pp.c */
@@ -536,11 +537,11 @@ void setup()
     if (millis() > 10000)
       break; /* continue anyway... */
   }
-  Serial.println("HELLO!");
-  Serial.print("Jiggler:\t");
-  Serial.println(jiggletimer.enabled);
-  Serial.print("Lefthanded:\t");
-  Serial.println(lefthanded);
+  DSERIAL(println("HELLO!"));
+  DSERIAL(print("Jiggler:\t"));
+  DSERIAL(println(jiggletimer.enabled));
+  DSERIAL(print("Lefthanded:\t"));
+  DSERIAL(println(lefthanded));
 #endif
   pin_LED.output();
   pin_LED.high();
