@@ -561,6 +561,11 @@ int8_t scale(int8_t v)
 {
   return v;
 }
+
+int8_t scrollscale(int8_t v)
+{
+  return v;
+}
 #else
 int8_t scale(int8_t v)
 {
@@ -608,12 +613,39 @@ int8_t scale(int8_t v)
     return -ret;
   return ret;
 }
+
+/* acceleration for the scroll wheel emulation. Now that we are using high
+ * resolution scrolling, this actually makes sense. */
+int8_t scrollscale(int8_t v)
+{
+  int a = abs(v);
+  int8_t ret;
+  if (a > 120/3) {  /* see the above scale() comment -- unlikely to get a>50 at all */
+    if (v > 0)      /* so this is just for paranoia */
+      return 120;
+    return -120;
+  }
+  switch(a) {
+    case 20 ... 128:
+      ret = 120; break;
+    case  4 ... 8:
+      ret = a * 3; break;
+    case 9 ... 15:
+      ret = a * 4; break;
+    case 16 ... 19:
+      ret = a = 5; break;
+    default:  return v;
+  }
+  if (v < 0)
+    return -ret;
+  return ret;
+}
 #endif
 
 void move(int8_t x, int8_t y, int8_t v, int8_t h = 0)
 {
 #ifdef MY_HIDMOUSE
-  Mouse.move(scale(x), scale(y), v, h);
+  Mouse.move(scale(x), scale(y), scrollscale(v), scrollscale(h));
 #else
   Mouse.move(scale(x), scale(y), v);
   (void)h;
